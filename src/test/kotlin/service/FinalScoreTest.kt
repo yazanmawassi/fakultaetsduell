@@ -61,13 +61,13 @@ class FinalScoreTest {
      */
     @Test
     fun testDataClassMethods() {
-        // copy() test
+        // tests copy()
         val copiedScore = testFinalScore.copy(total = 30)
         assertEquals(30, copiedScore.total)
         assertEquals(testFinalScore.faculty, copiedScore.faculty)
         assertEquals(testFinalScore.publicationPoints, copiedScore.publicationPoints)
 
-        // equals() und hashCode() test
+        // tests equals() und hashCode()
         val identicalScore = testFinalScore.copy()
         val differentScore = testFinalScore.copy(publicationPoints = 0)
 
@@ -79,7 +79,7 @@ class FinalScoreTest {
         assertNotEquals(testFinalScore, null)
         assertNotEquals(testFinalScore, "Ein anderer Typ")
 
-        // toString() test
+        // tests toString()
         val toStringResult = testFinalScore.toString()
         assertTrue(toStringResult.contains("FinalScore"))
         assertTrue(toStringResult.contains("publicationPoints=15"))
