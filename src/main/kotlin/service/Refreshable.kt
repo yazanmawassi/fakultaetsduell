@@ -10,4 +10,37 @@ package service
  *
  * @see AbstractRefreshingService
  */
-interface Refreshable
+
+import entity.CardSuit
+import entity.Faculty
+import entity.ResearchCard
+
+
+interface Refreshable {
+
+
+    fun refreshAfterStartGame() {}
+
+
+    fun refreshAfterResearch(faculty: Faculty) {}
+
+
+    fun refreshAfterDrawIdea(faculty: Faculty) {}
+
+
+    fun refreshAfterStrategyStart(drawnCards: List<ResearchCard>) {}
+
+    fun refreshAfterStrategyEnd(faculty: Faculty) {}
+
+    fun refreshAfterPublish(faculty: Faculty, area: CardSuit, points: Int) {}
+
+    fun refreshAfterSabotage(target: Faculty, area: CardSuit) {}
+
+    fun refreshAfterUseLiterature(faculty: Faculty, card: ResearchCard) {}
+
+    fun refreshAfterTurnChange(nextFaculty: Faculty) {}
+
+    fun refreshAfterGameEnd(scores: List<FinalScore>) {}
+
+    fun refreshAfterLog(message: String) {}
+}
