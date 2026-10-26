@@ -18,7 +18,7 @@ class RootService {
     val playerActionService = PlayerActionService(this)
 
     /**
-     * Registers [newRefreshable] at all services,
+     * Registers [newRefreshable] at all services,,
      * so it is informed about every change in the game.
      */
     fun addRefreshable(newRefreshable: Refreshable) {
