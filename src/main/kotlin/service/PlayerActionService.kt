@@ -118,6 +118,42 @@ class PlayerActionService(private val rootService: RootService) : AbstractRefres
     /** Removes the top card of [target]'s stack in [area] ("Konkurrenz ausbremsen"). */
     fun sabotage(target: Faculty, area: CardSuit) { TODO() }
 
-    /** Takes [card] from the central literature ("Literatur nutzen"). */
-    fun useLiterature(card: ResearchCard) { TODO() }
+    /**
+     * Executes the "Literatur nutzen" (Use Literature) action for the active faculty.
+     *
+     * The active faculty takes a specific [card] from the central literature area and places it
+     * directly onto their matching research stack. This action consumes exactly 2 Action Points (AP).
+     *
+     * @param card The [ResearchCard] to be removed from the central literature and added to the faculty's research.
+     * @throws IllegalStateException if no active game is running, if the game has already ended,
+     *         or if the active faculty has fewer than 2 action points.
+     * @throws IllegalArgumentException if the specified [card] is not currently present in the central literature.
+     */
+    fun useLiterature(card: ResearchCard) {
+        val game = checkNotNull(rootService.currentGame) {
+            "Es läuft kein Spiel."
+        }
+
+        check(game.endgameTurnsLeft != 0) {
+            "Das Spiel ist bereits beendet."
+        }
+
+        val faculty = game.faculties[game.facultyAtTurn]
+
+        check(faculty.actionPoints >= 2) {
+            "Nicht genügend Aktionspunkte. Literatur nutzen kostet 2 AP."
+        }
+
+        require(card in game.centralLiterature) {
+            "Die gewählte Karte befindet sich nicht in der zentralen Literatur."
+        }
+
+        game.centralLiterature.remove(card)
+        faculty.addResearch(card)
+        faculty.actionPoints -= 2
+
+        onAllRefreshables {
+            refreshAfterLog("${faculty.name} nutzt die zentrale Literatur.")
+        }
+    }
 }
