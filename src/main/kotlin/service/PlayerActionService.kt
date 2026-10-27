@@ -12,7 +12,50 @@ import entity.ResearchCard
 class PlayerActionService(private val rootService: RootService) : AbstractRefreshingService() {
 
     /** Places [card] from the hand on the matching research stack ("Forschung vorantreiben"). */
-    fun research(card: ResearchCard) { TODO() }
+    fun research(card: ResearchCard) {
+    val game = checkNotNull(rootService.currentGame) {
+        "Es läuft kein Spiel."
+    }
+
+    check(game.endgameTurnsLeft != 0) {
+        "Das Spiel ist bereits beendet."
+    }
+
+    val faculty = game.faculties[game.facultyAtTurn]
+
+    check(faculty.actionPoints >= 1) {
+        "Nicht genügend Aktionspunkte."
+    }
+
+    require(card in faculty.handCards) {
+        "Die Karte befindet sich nicht auf der Hand."
+    }
+
+    // Handkarte auf den passenden Forschungsstapel legen
+    faculty.handCards.remove(card)
+    faculty.addResearch(card)
+
+    // Eine Karte zur zentralen Literatur hinzufügen
+    if (game.drawStack.isNotEmpty()) {
+        if (game.centralLiterature.size >= 6) {
+            val oldestCard = game.centralLiterature.removeAt(0)
+            game.discardStack.add(oldestCard)
+        }
+
+        val drawnCard = game.drawStack.removeLast()
+        game.centralLiterature.add(drawnCard)
+    }
+
+    faculty.actionPoints -= 1
+
+    onAllRefreshables {
+        refreshAfterResearch(faculty)
+    }
+
+    onAllRefreshables {
+        refreshAfterLog("${faculty.name} treibt Forschung voran.")
+    }
+}
 
     /**
      * Draws one card from the common draw stack and adds it to the active faculty's hand ("Neue Ideen gewinnen").
