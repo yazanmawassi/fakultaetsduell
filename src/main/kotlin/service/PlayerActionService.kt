@@ -107,10 +107,104 @@ class PlayerActionService(private val rootService: RootService) : AbstractRefres
     }
 
     /** First step of "Strategie anpassen": discards [discard] and draws two cards. */
-    fun startStrategy(discard: ResearchCard) { TODO() }
+    fun startStrategy(discard: ResearchCard) {
+
+        // 1. Get current game
+        val game = rootService.currentGame
+            ?: throw IllegalStateException("No active game")
+
+        // 2. Get active faculty
+        val currentFaculty = game.faculties[game.facultyAtTurn]
+
+        // 3. Check action points
+        require(currentFaculty.actionPoints >= 1) {
+            "Not enough action points"
+        }
+
+        // 4. Check whether card belongs to player
+        require(currentFaculty.handCards.any { it === discard }) {
+            "Card is not in player's hand"
+        }
+
+        // 5. Check draw stack
+        require(game.drawStack.size >= 2) {
+            "Not enough cards in draw stack"
+        }
+
+        // 6. Prevent starting another strategy
+        require(game.pendingStrategyCards.isEmpty()) {
+            "Strategy already in progress"
+        }
+
+        // 7. Remove card from player's hand
+        currentFaculty.handCards.remove(discard)
+
+        // 8. Add discarded card to discard stack
+        game.discardStack.add(discard)
+
+        // 9. Draw two cards
+        val firstCard = game.drawStack.removeAt(
+            game.drawStack.lastIndex
+        )
+
+        val secondCard = game.drawStack.removeAt(
+            game.drawStack.lastIndex
+        )
+
+        val drawnCards = listOf(firstCard, secondCard)
+
+        // 10. Store cards until player chooses
+        game.pendingStrategyCards.addAll(drawnCards)
+
+        // 11. Deduct 1 action point
+        currentFaculty.actionPoints -= 1
+
+        // 12. Notify GUI
+        onAllRefreshables {
+            refreshAfterStrategyStart(drawnCards)
+        }
+    }
 
     /** Second step of "Strategie anpassen": [keep] goes to the hand, the other card is discarded. */
-    fun finishStrategy(keep: ResearchCard) { TODO() }
+
+    fun finishStrategy(keep: ResearchCard) {
+
+        // 1. Get current game
+        val game = rootService.currentGame
+            ?: throw IllegalStateException("No active game")
+
+        // 2. Get active player
+        val currentFaculty = game.faculties[game.facultyAtTurn]
+
+        // 3. Check if strategy is in progress
+        require(game.pendingStrategyCards.size == 2) {
+            "No strategy in progress"
+        }
+
+        // 4. Check selected card
+        require(game.pendingStrategyCards.any { it === keep }) {
+            "Selected card is not one of the drawn cards"
+        }
+
+        // 5. Find the other card
+        val discard = game.pendingStrategyCards.first {
+            it !== keep
+        }
+
+        // 6. Keep selected card
+        currentFaculty.handCards.add(keep)
+
+        // 7. Discard other card
+        game.discardStack.add(discard)
+
+        // 8. Clear temporary cards
+        game.pendingStrategyCards.clear()
+
+        // 9. Update GUI
+        onAllRefreshables {
+            refreshAfterStrategyEnd(currentFaculty)
+        }
+    }
 
     /** Publishes the research stack of [area] ("Publizieren"). */
     fun publish(area: CardSuit) { TODO() }
