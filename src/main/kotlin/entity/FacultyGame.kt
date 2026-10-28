@@ -22,7 +22,7 @@ class FacultyGame(
 
     /** Open cards in the middle that every faculty can use (max. 6, oldest first). */
     val centralLiterature: MutableList<ResearchCard> = mutableListOf()
-
+    val pendingStrategyCards: MutableList<ResearchCard> = mutableListOf()
     /** Passes the turn to the next faculty; after the last one, the first one starts again. */
     fun nextFaculty() {
         facultyAtTurn = (facultyAtTurn + 1) % faculties.size
