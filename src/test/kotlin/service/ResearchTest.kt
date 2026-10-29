@@ -5,11 +5,8 @@ import entity.CardValue
 import entity.Faculty
 import entity.FacultyGame
 import entity.ResearchCard
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertFalse
-import kotlin.test.assertSame
+import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Test
 
 /**
  * Tests valid research actions and invalid game states.
@@ -39,7 +36,6 @@ class ResearchTest {
      */
     @Test
     fun testResearch() {
-        // Prepare the game state
         val rootService = createRootService()
         val game = checkNotNull(rootService.currentGame)
         val faculty = game.faculties[game.facultyAtTurn]
@@ -49,10 +45,8 @@ class ResearchTest {
         faculty.handCards.add(card)
         game.drawStack.add(drawnCard)
 
-        // Perform the research action
         rootService.playerActionService.research(card)
 
-        // Verify the resulting game state
         assertFalse(card in faculty.handCards)
         assertEquals(
             listOf(card),
@@ -134,7 +128,7 @@ class ResearchTest {
         val rootService = RootService()
         val card = ResearchCard(CardSuit.HEARTS, CardValue.ACE)
 
-        assertFailsWith<IllegalStateException> {
+        assertThrows(IllegalStateException::class.java) {
             rootService.playerActionService.research(card)
         }
     }
@@ -152,7 +146,7 @@ class ResearchTest {
         faculty.handCards.add(card)
         game.endgameTurnsLeft = 0
 
-        assertFailsWith<IllegalStateException> {
+        assertThrows(IllegalStateException::class.java) {
             rootService.playerActionService.research(card)
         }
 
@@ -175,7 +169,7 @@ class ResearchTest {
         faculty.handCards.add(card)
         faculty.actionPoints = 0
 
-        assertFailsWith<IllegalStateException> {
+        assertThrows(IllegalStateException::class.java) {
             rootService.playerActionService.research(card)
         }
 
@@ -195,7 +189,7 @@ class ResearchTest {
         val faculty = game.faculties[game.facultyAtTurn]
         val card = ResearchCard(CardSuit.HEARTS, CardValue.ACE)
 
-        assertFailsWith<IllegalArgumentException> {
+        assertThrows(IllegalArgumentException::class.java) {
             rootService.playerActionService.research(card)
         }
 
