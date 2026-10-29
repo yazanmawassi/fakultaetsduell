@@ -185,8 +185,7 @@ class PlayerActionService(private val rootService: RootService) : AbstractRefres
 
         // 7. Phase 3: Notify the user interface with the calculated total points
         onAllRefreshables {
-            refreshAfterPublish(activeFaculty, area, if (!alreadyPublished) earnedPoints + 1 else earnedPoints
-            )
+            refreshAfterPublish(activeFaculty, area, earnedPoints)
         }
 
 
