@@ -91,7 +91,7 @@ class PlayerActionService(private val rootService: RootService) : AbstractRefres
             "Systemfehler: Der Nachziehstapel (drawStack) ist leer! Es können keine Ideen mehr gewonnen werden."
         }
 
-        // 1. Pop the top card off the mutable list representation of the deck
+        // 1. remove the top card off the mutable list representation of the deck
         val drawnCard = game.drawStack.removeAt(game.drawStack.lastIndex)
 
         // 2. Insert the popped card into the player's secret hand cards collection
@@ -206,8 +206,89 @@ class PlayerActionService(private val rootService: RootService) : AbstractRefres
         }
     }
 
-    /** Publishes the research stack of [area] ("Publizieren"). */
-    fun publish(area: CardSuit) { TODO() }
+
+
+
+    /**
+     * Publishes the active research stack of a specific [CardSuit] ("Publizieren").
+     *
+     * This operation secures the research cards from opponents' sabotage, awards research points
+     * based on the stack size, checks for the first-to-publish bonus, and deducts exactly 2 Action Points (AP).
+     *
+     * This method strictly complies with the university's 3-phase execution model:
+     * 1. **Phase 1 (Prüfen):** Validates the active game state and ensures the player has at least 2 AP
+     *    and the selected research stack contains at least 2 cards.
+     * 2. **Phase 2 (Ausführen):** Awards calculated points to the active faculty, updates the entity state
+     *    by moving all cards to the publications list, and deducts the operational cost (2 AP).
+     * 3. **Phase 3 (Aktualisieren):** Notifies all registered UI observers via the refresh interface.
+     *
+     * @param area The [CardSuit] (e.g., HEARTS, SPADES) of the research stack to be published.
+     * @throws IllegalStateException If no game is active or if the game has already ended.
+     * @throws IllegalArgumentException If the active faculty has fewer than 2 AP, or if the chosen
+     *         research stack contains fewer than 2 cards.
+     */
+    fun publish(area: CardSuit) {
+
+
+        val game = checkNotNull(rootService.currentGame) {
+            "Systemfehler: Es läuft aktuell kein aktives Spiel!"
+        }
+        check(game.endgameTurnsLeft != 0) {
+            "Das Spiel ist bereits beendet."
+        }
+        val activeFaculty = game.faculties[game.facultyAtTurn]
+
+        require(activeFaculty.actionPoints >= 2)
+        { "Fehler: Nicht genug Aktionspunkte !" }
+
+        val researchStack = activeFaculty.researchActivity[area]
+        require(researchStack != null && researchStack.size >= 2)
+        { "Fehler: Es müssen mindestens 2 Karten auf dem Forschungsstapel liegen," +
+                    "um zu veröffentlichen!"
+        }
+
+        // 1. Remember the number of cards on the stack
+        val cardCount = researchStack.size
+
+        // 2. Calculate points based on the card count [2=3 Pkt, 3=5 Pkt, 4=7 Pkt, 5+=9 Pkt]
+        val earnedPoints = when {
+            cardCount == 2 -> 3
+            cardCount == 3 -> 5
+            cardCount == 4 -> 7
+            cardCount >= 5 -> 9
+            else -> 0
+        }
+        activeFaculty.researchPoints += earnedPoints
+
+        // 3. Check for First-to-Publish bonus (+1 point if no one else has published in this suit yet)
+        val alreadyPublished = game.faculties.any { faculty ->
+            faculty.publications.any { card -> card.suit == area }
+        }
+
+        // If it is the first publication in this area, award +1 bonus point
+        if (!alreadyPublished) {
+            activeFaculty.researchPoints += 1
+        }
+
+        // 4. Move ALL cards from this research stack into the publications list
+        activeFaculty.publications.addAll(researchStack)
+
+        // 5. Clear the active research stack
+        researchStack.clear()
+
+
+        // 6. Deduct exactly 2 action points
+        activeFaculty.actionPoints -= 2
+
+        // 7. Phase 3: Notify the user interface with the calculated total points
+        onAllRefreshables {
+            refreshAfterPublish(activeFaculty, area, if (!alreadyPublished) earnedPoints + 1 else earnedPoints
+            )
+        }
+
+
+    }
+
 
     /** Removes the top card of [target]'s stack in [area] ("Konkurrenz ausbremsen"). */
 
