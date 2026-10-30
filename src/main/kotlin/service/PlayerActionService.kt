@@ -78,6 +78,9 @@ class PlayerActionService(private val rootService: RootService) : AbstractRefres
             "Systemfehler: Es läuft aktuell kein aktives Spiel!"
         }
 
+        check(game.endgameTurnsLeft != 0) {
+            "Aktion nicht erlaubt: Das Spiel ist bereits beendet."
+        }
         val activeFaculty = game.faculties[game.facultyAtTurn]
 
         // Validate that the current player has at least 1 Action Point left

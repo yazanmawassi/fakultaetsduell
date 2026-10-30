@@ -146,7 +146,7 @@ class DrawIdeaTest {
         game.endgameTurnsLeft = 0
 
         assertFailsWith<IllegalStateException> {
-            rootService.playerActionService.publish(CardSuit.HEARTS)
+            rootService.playerActionService.drawIdea()
         }
     }
 }
