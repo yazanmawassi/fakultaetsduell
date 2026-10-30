@@ -244,7 +244,7 @@ class PlayerActionService(private val rootService: RootService) : AbstractRefres
         val researchStack = activeFaculty.researchActivity[area]
         require(researchStack != null && researchStack.size >= 2)
         { "Fehler: Es müssen mindestens 2 Karten auf dem Forschungsstapel liegen," +
-                    "um zu veröffentlichen!"
+                "um zu veröffentlichen!"
         }
 
         // 1. Remember the number of cards on the stack
@@ -282,14 +282,11 @@ class PlayerActionService(private val rootService: RootService) : AbstractRefres
 
         // 7. Phase 3: Notify the user interface with the calculated total points
         onAllRefreshables {
-            refreshAfterPublish(activeFaculty, area, if (!alreadyPublished) earnedPoints + 1 else earnedPoints
-            )
+            refreshAfterPublish(activeFaculty, area, earnedPoints)
         }
 
 
     }
-
-
     /** Removes the top card of [target]'s stack in [area] ("Konkurrenz ausbremsen"). */
 
     /**
