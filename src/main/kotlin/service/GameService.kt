@@ -126,6 +126,18 @@ class GameService(
         }
 
 
+    /**
+    * Calculates the cumulative majority bonus points for a single [Faculty] across all available research topics.
+    *
+    * Iterates through every existing [CardSuit] to determine if the given faculty holds either the
+    * highest (first place) or the second-highest (second place) publication volume globally compared to competitors.
+    * Only counts active non-zero publications toward the ranking thresholds.
+    *
+    * @param faculty The [Faculty] instance whose majority bonuses are being evaluated.
+    * @param publishedCounts A pre-calculated mapping containing the total number of published cards categorized
+    *        by each [Faculty] and their corresponding [CardSuit] counts.
+    * @return The total aggregated integer score earned from first and second-place majority achievements.
+    */
     private fun majorityBonus(
         faculty: Faculty,
         publishedCounts: Map<Faculty, Map<CardSuit, Int>>
@@ -145,6 +157,9 @@ class GameService(
         }
     }
 
+    /**
+     * Internal structural settings and mathematical constants governing game constraints and end-game scoring evaluation.
+     */
     private companion object {
         const val MIN_FACULTIES = 2
         const val MAX_FACULTIES = 4
