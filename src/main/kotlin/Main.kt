@@ -1,4 +1,4 @@
-import gui.SopraApplication
+/**import gui.SopraApplication
 
 /**
  * Main entry point that starts the [SopraApplication]
@@ -8,4 +8,17 @@ import gui.SopraApplication
 fun main() {
     SopraApplication().show()
     println("Application ended. Goodbye")
+}
+
+ */
+
+import gui.SopraApplication
+
+/**
+ * The main program startup execution context method.
+ * Instantiates the SopraApplication and displays the window via show().
+ */
+fun main() {
+    //
+    SopraApplication().show()
 }
