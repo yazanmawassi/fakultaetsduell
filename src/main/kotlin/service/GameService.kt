@@ -67,6 +67,11 @@ class GameService(
 
         onAllRefreshables { refreshAfterTurnChange(next) }
         onAllRefreshables { refreshAfterLog("${next.name} ist am Zug.") }
+        // Verklemmung: the new faculty cannot act at all, so it is skipped.
+        if (!rootService.playerActionService.hasPossibleAction()) {
+            onAllRefreshables { refreshAfterLog("${next.name} kann keine Aktion ausführen und wird übersprungen.") }
+            endTurn()
+        }
     }
 
     /** Creates all 52 cards in randomized order. */
