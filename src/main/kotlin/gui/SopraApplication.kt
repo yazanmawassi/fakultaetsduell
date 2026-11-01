@@ -1,41 +1,74 @@
+
 package gui
 
 import service.Refreshable
 import service.RootService
+import service.FinalScore
 import tools.aqua.bgw.core.BoardGameApplication
 
 /**
- * Main application: starts with the [StartScene], shows the [GameScene] as soon as a game was started.
+ * Main application managing the start, game and end scenes.
  */
-class SopraApplication : BoardGameApplication("Exzellente Informatik-Forschung"), Refreshable {
+class SopraApplication :
+    BoardGameApplication("Exzellente Informatik-Forschung"),
+    Refreshable {
 
-    /** The root service instance, used to call service methods and access the entity layer. */
+    /** Central service managing the game logic. */
     val rootService: RootService = RootService()
 
-    /** Start menu for entering the faculty names. */
+    /** Start menu for entering faculty names. */
     private val startScene = StartScene(this)
 
-    /** The main game scene. */
+    /** Main game scene. */
     private val gameScene = GameScene(rootService)
 
+    /** End scene displaying the final scores. */
+    private val endGameScene = EndGameScene(
+        onGameEnded = { showEndGameScene() },
+        onBackToMenu = { showGameScene(startScene) }
+    )
+
     init {
-        rootService.addRefreshables(this, gameScene)
+        rootService.addRefreshables(
+            this,
+            gameScene,
+            endGameScene
+        )
+
         showGameScene(startScene)
     }
 
     /**
-     * Starts a new game with the given faculty names (called by the [StartScene]).
-     * The [GameScene] is shown in [refreshAfterStartGame].
-     *
-     * @param names entered faculty names
-     * @param randomOrder true: random order, false: order as entered
-     * @throws IllegalArgumentException if the names are invalid
+     * Starts a new game with the selected faculty names.
      */
-    fun showMainGameScene(names: List<String>, randomOrder: Boolean = false) {
-        rootService.gameService.startNewGame(names, randomOrder)
+    fun showMainGameScene(
+        names: List<String>,
+        randomOrder: Boolean = false
+    ) {
+        rootService.gameService.startNewGame(
+            names,
+            randomOrder
+        )
     }
 
+    /**
+     * Displays the game scene after the game starts.
+     */
     override fun refreshAfterStartGame() {
         showGameScene(gameScene)
+    }
+
+    /**
+     * Displays the end scene when the game finishes.
+     */
+    override fun refreshAfterGameEnd(scores: List<FinalScore>) {
+        showEndGameScene()
+    }
+
+    /**
+     * Switches to the final result scene.
+     */
+    fun showEndGameScene() {
+        showGameScene(endGameScene)
     }
 }
