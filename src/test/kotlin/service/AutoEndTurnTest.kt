@@ -46,11 +46,17 @@ class AutoEndTurnTest {
         game().faculties.forEach { f -> f.researchActivity.values.forEach { it.clear() } }
         game().faculties[1].handCards.clear()
 
-        rootService.gameService.endTurn()
+        endTurnNow()
 
         assertEquals(2, game().facultyAtTurn)
         assertTrue(game().endgameTurnsLeft != 0)
     }
 
     private fun game(): FacultyGame = checkNotNull(rootService.currentGame)
+
+    /** Uses up all action points of the active faculty and ends the turn. */
+    private fun endTurnNow() {
+        game().faculties[game().facultyAtTurn].actionPoints = 0
+        rootService.gameService.endTurn()
+    }
 }

@@ -54,7 +54,9 @@ class GameService(
     fun endTurn() {
         val game = checkNotNull(rootService.currentGame) { "Es läuft kein Spiel." }
         check(game.endgameTurnsLeft != 0) { "Das Spiel ist bereits beendet." }
-
+        check(!rootService.playerActionService.hasPossibleAction()) {
+            "Der Zug kann erst beendet werden, wenn keine Aktion mehr möglich ist."
+        }
         updateEndgameCounter(game)
         if (isGameOver(game)) {
             endGame()
