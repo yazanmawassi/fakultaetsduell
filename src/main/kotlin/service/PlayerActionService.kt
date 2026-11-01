@@ -382,4 +382,43 @@ class PlayerActionService(private val rootService: RootService) : AbstractRefres
             refreshAfterLog("${faculty.name} nutzt die zentrale Literatur.")
         }
     }
+    /**
+     * Checks whether the active faculty can still perform at least one action.
+     *
+     * Used to end a turn automatically and to detect a deadlock in the last round
+     * (action points left, but no action possible).
+     *
+     * @return true if at least one action is allowed, false otherwise
+     * @throws IllegalStateException if no game is running
+     */
+    fun hasPossibleAction(): Boolean {
+        val game = checkNotNull(rootService.currentGame) { "Es läuft kein Spiel." }
+
+        // A started strategy must be finished first, so an action is still possible.
+        if (game.pendingStrategyCards.isNotEmpty()) return true
+
+        val faculty = game.faculties[game.facultyAtTurn]
+        val ap = faculty.actionPoints
+        val hand = faculty.handCards
+
+        // 1 AP
+        val canResearch = ap >= 1 && hand.isNotEmpty()
+        val canDrawIdea = ap >= 1 && game.drawStack.isNotEmpty() && hand.size <= MAX_HAND_BEFORE_DRAW
+        val canAdjustStrategy = ap >= 1 && hand.isNotEmpty() && game.drawStack.size >= 2
+
+        // 2 AP
+        val canPublish = ap >= 2 && faculty.researchActivity.values.any { it.size >= 2 }
+        val canSabotage = ap >= 2 && game.faculties.any { other ->
+            other !== faculty && other.researchActivity.values.any { it.isNotEmpty() }
+        }
+        val canUseLiterature = ap >= 2 && game.centralLiterature.isNotEmpty()
+
+        return canResearch || canDrawIdea || canAdjustStrategy ||
+                canPublish || canSabotage || canUseLiterature
+    }
+
+    private companion object {
+        /** "Neue Ideen" is only allowed with at most 5 hand cards (hand limit 6). */
+        const val MAX_HAND_BEFORE_DRAW = 5
+    }
 }
