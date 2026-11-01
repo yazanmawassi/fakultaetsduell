@@ -7,55 +7,56 @@ import entity.ResearchCard
 /**
  * Service for all actions the active faculty can do in its turn.
  */
-// TEMPORÄR: // Nur für Detekt-Warnungen für leere Methoden unterdrücken , damit ich die Klassen in Service Branch puschen kann , wir müssen das später löschen.
-@Suppress("UnusedParameter", "UnusedPrivateProperty", "NotImplementedDeclaration")
+
 class PlayerActionService(private val rootService: RootService) : AbstractRefreshingService() {
 
     /** Places [card] from the hand on the matching research stack ("Forschung vorantreiben"). */
     fun research(card: ResearchCard) {
-    val game = checkNotNull(rootService.currentGame) {
-        "Es läuft kein Spiel."
-    }
-
-    check(game.endgameTurnsLeft != 0) {
-        "Das Spiel ist bereits beendet."
-    }
-
-    val faculty = game.faculties[game.facultyAtTurn]
-
-    check(faculty.actionPoints >= 1) {
-        "Nicht genügend Aktionspunkte."
-    }
-
-    require(card in faculty.handCards) {
-        "Die Karte befindet sich nicht auf der Hand."
-    }
-
-    // Handkarte auf den passenden Forschungsstapel legen
-    faculty.handCards.remove(card)
-    faculty.addResearch(card)
-
-    // Eine Karte zur zentralen Literatur hinzufügen
-    if (game.drawStack.isNotEmpty()) {
-        if (game.centralLiterature.size >= 6) {
-            val oldestCard = game.centralLiterature.removeAt(0)
-            game.discardStack.add(oldestCard)
+        val game = checkNotNull(rootService.currentGame) {
+            "Es läuft kein Spiel."
         }
 
-        val drawnCard = game.drawStack.removeLast()
-        game.centralLiterature.add(drawnCard)
-    }
+        check(game.endgameTurnsLeft != 0) {
+            "Das Spiel ist bereits beendet."
+        }
 
-    faculty.actionPoints -= 1
+        val faculty = game.faculties[game.facultyAtTurn]
 
-    onAllRefreshables {
-        refreshAfterResearch(faculty)
-    }
+        check(faculty.actionPoints >= 1) {
+            "Nicht genügend Aktionspunkte."
+        }
 
-    onAllRefreshables {
-        refreshAfterLog("${faculty.name} treibt Forschung voran.")
+        require(card in faculty.handCards) {
+            "Die Karte befindet sich nicht auf der Hand."
+        }
+
+        // Handkarte auf den passenden Forschungsstapel legen
+        faculty.handCards.remove(card)
+        faculty.addResearch(card)
+
+        // Eine Karte zur zentralen Literatur hinzufügen
+        if (game.drawStack.isNotEmpty()) {
+            if (game.centralLiterature.size >= 6) {
+                val oldestCard = game.centralLiterature.removeAt(0)
+                game.discardStack.add(oldestCard)
+            }
+
+            val drawnCard = game.drawStack.removeLast()
+            game.centralLiterature.add(drawnCard)
+        }
+
+        faculty.actionPoints -= 1
+
+        onAllRefreshables {
+            refreshAfterResearch(faculty)
+        }
+
+        onAllRefreshables {
+            refreshAfterLog("${faculty.name} treibt Forschung voran.")
+        }
+
+        endTurnIfNoActionLeft()
     }
-}
 
     /**
      * Draws one card from the common draw stack and adds it to the active faculty's hand ("Neue Ideen gewinnen").
@@ -107,6 +108,8 @@ class PlayerActionService(private val rootService: RootService) : AbstractRefres
             refreshAfterDrawIdea(activeFaculty)
         }
 
+
+        endTurnIfNoActionLeft()
     }
 
     /** First step of "Strategie anpassen": discards [discard] and draws two cards. */
@@ -207,6 +210,8 @@ class PlayerActionService(private val rootService: RootService) : AbstractRefres
         onAllRefreshables {
             refreshAfterStrategyEnd(currentFaculty)
         }
+
+        endTurnIfNoActionLeft()
     }
 
 
@@ -288,7 +293,7 @@ class PlayerActionService(private val rootService: RootService) : AbstractRefres
             refreshAfterPublish(activeFaculty, area, earnedPoints)
         }
 
-
+        endTurnIfNoActionLeft()
     }
     /** Removes the top card of [target]'s stack in [area] ("Konkurrenz ausbremsen"). */
 
@@ -342,6 +347,8 @@ class PlayerActionService(private val rootService: RootService) : AbstractRefres
         onAllRefreshables {
             refreshAfterSabotage(target, area)
         }
+
+        endTurnIfNoActionLeft()
     }
 
     /**
@@ -381,5 +388,53 @@ class PlayerActionService(private val rootService: RootService) : AbstractRefres
         onAllRefreshables {
             refreshAfterLog("${faculty.name} nutzt die zentrale Literatur.")
         }
+
+        endTurnIfNoActionLeft()
+    }
+    /**
+     * Checks whether the active faculty can still perform at least one action.
+     *
+     * Used to end a turn automatically and to detect a deadlock in the last round
+     * (action points left, but no action possible).
+     *
+     * @return true if at least one action is allowed, false otherwise
+     * @throws IllegalStateException if no game is running
+     */
+    fun hasPossibleAction(): Boolean {
+        val game = checkNotNull(rootService.currentGame) { "Es läuft kein Spiel." }
+
+        // A started strategy must be finished first, so an action is still possible.
+        if (game.pendingStrategyCards.isNotEmpty()) return true
+
+        val faculty = game.faculties[game.facultyAtTurn]
+        val ap = faculty.actionPoints
+        val hand = faculty.handCards
+
+        // 1 AP
+        val canResearch = ap >= 1 && hand.isNotEmpty()
+        val canDrawIdea = ap >= 1 && game.drawStack.isNotEmpty() && hand.size <= MAX_HAND_BEFORE_DRAW
+        val canAdjustStrategy = ap >= 1 && hand.isNotEmpty() && game.drawStack.size >= 2
+
+        // 2 AP
+        val canPublish = ap >= 2 && faculty.researchActivity.values.any { it.size >= 2 }
+        val canSabotage = ap >= 2 && game.faculties.any { other ->
+            other !== faculty && other.researchActivity.values.any { it.isNotEmpty() }
+        }
+        val canUseLiterature = ap >= 2 && game.centralLiterature.isNotEmpty()
+
+        return canResearch || canDrawIdea || canAdjustStrategy ||
+                canPublish || canSabotage || canUseLiterature
+    }
+
+    /** Ends the turn automatically if the active faculty cannot do any action anymore. */
+    private fun endTurnIfNoActionLeft() {
+        if (!hasPossibleAction()) {
+            rootService.gameService.endTurn()
+        }
+    }
+
+    private companion object {
+        /** "Neue Ideen" is only allowed with at most 5 hand cards (hand limit 6). */
+        const val MAX_HAND_BEFORE_DRAW = 5
     }
 }

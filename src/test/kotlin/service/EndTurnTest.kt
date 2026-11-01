@@ -30,6 +30,16 @@ class EndTurnTest {
         assertFailsWith<IllegalStateException> { rootService.gameService.endTurn() }
     }
 
+    /** The turn cannot be ended while an action is still possible. */
+    @Test
+    fun `endTurn fails while action is possible`() {
+        rootService.gameService.startNewGame(listOf("A", "B"))
+        val game = assertNotNull(rootService.currentGame)
+
+        assertFailsWith<IllegalStateException> { rootService.gameService.endTurn() }
+        assertEquals(0, game.facultyAtTurn)
+    }
+
     /** The next faculty gets the turn and 2 new action points. */
     @Test
     fun `endTurn switches to next faculty and resets action points`() {
@@ -38,7 +48,7 @@ class EndTurnTest {
         game.faculties[1].actionPoints = 0
         refreshable.reset()
 
-        rootService.gameService.endTurn()
+        endTurnNow()
 
         assertEquals(1, game.facultyAtTurn)
         assertEquals(2, game.faculties[1].actionPoints)
@@ -53,8 +63,8 @@ class EndTurnTest {
         rootService.gameService.startNewGame(listOf("A", "B"))
         val game = assertNotNull(rootService.currentGame)
 
-        rootService.gameService.endTurn()
-        rootService.gameService.endTurn()
+        endTurnNow()
+        endTurnNow()
 
         assertEquals(0, game.facultyAtTurn)
     }
@@ -66,16 +76,16 @@ class EndTurnTest {
         val game = assertNotNull(rootService.currentGame)
         game.drawStack.clear()
 
-        rootService.gameService.endTurn()
+        endTurnNow()
         assertEquals(1, game.facultyAtTurn)
         assertEquals(2, game.endgameTurnsLeft)
         assertNull(refreshable.finalScores)
 
-        rootService.gameService.endTurn()
+        endTurnNow()
         assertEquals(2, game.facultyAtTurn)
         assertNull(refreshable.finalScores)
 
-        rootService.gameService.endTurn()
+        endTurnNow()
         assertNotNull(refreshable.finalScores)
     }
 
@@ -86,8 +96,15 @@ class EndTurnTest {
         val game = assertNotNull(rootService.currentGame)
         game.drawStack.clear()
         game.endgameTurnsLeft = 1
-        rootService.gameService.endTurn()
+        endTurnNow()
 
         assertFailsWith<IllegalStateException> { rootService.gameService.endTurn() }
+    }
+
+    /** Uses up all action points of the active faculty and ends the turn. */
+    private fun endTurnNow() {
+        val game = assertNotNull(rootService.currentGame)
+        game.faculties[game.facultyAtTurn].actionPoints = 0
+        rootService.gameService.endTurn()
     }
 }
