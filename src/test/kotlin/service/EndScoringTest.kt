@@ -131,11 +131,12 @@ class EndScoringTest {
     private fun faculty(name: String): Faculty =
         assertNotNull(rootService.currentGame).faculties.first { it.name == name }
 
-    /** Brings the running game to its end. */
+    /** Brings the running game to its end (last turn, no action points left). */
     private fun finishGame() {
         val game = assertNotNull(rootService.currentGame)
         game.drawStack.clear()
         game.endgameTurnsLeft = 1
+        game.faculties[game.facultyAtTurn].actionPoints = 0
         rootService.gameService.endTurn()
     }
 

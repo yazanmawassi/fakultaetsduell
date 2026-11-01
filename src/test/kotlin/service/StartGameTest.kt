@@ -108,4 +108,21 @@ class StartGameTest {
 
         assertTrue(refreshable.logMessages.any { it.contains("beginnt") })
     }
+    /** With randomOrder = false, the entered order is kept. */
+    @Test
+    fun `startNewGame keeps entered order when not random`() {
+        rootService.gameService.startNewGame(listOf("A", "B", "C"), randomOrder = false)
+
+        val game = assertNotNull(rootService.currentGame)
+        assertEquals(listOf("A", "B", "C"), game.faculties.map { it.name })
+    }
+
+    /** With randomOrder = true, all faculties are still there. */
+    @Test
+    fun `startNewGame with random order keeps all faculties`() {
+        rootService.gameService.startNewGame(listOf("A", "B", "C", "D"), randomOrder = true)
+
+        val game = assertNotNull(rootService.currentGame)
+        assertEquals(setOf("A", "B", "C", "D"), game.faculties.map { it.name }.toSet())
+    }
 }

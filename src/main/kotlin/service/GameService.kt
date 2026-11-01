@@ -14,19 +14,22 @@ class GameService(
 ) : AbstractRefreshingService() {
 
     /**
-     * Starts a new game with 2 to 4 faculties in random order.
+     * Starts a new game with 2 to 4 faculties.
      *
-     * @param facultyNames Unique, non-blank faculty names.
+     * @param facultyNames Unique, non-blank faculty names in the entered order.
+     * @param randomOrder If true, the order of the faculties is shuffled;
+     *                    otherwise the entered order is kept.
      * @throws IllegalArgumentException if the names are invalid
      */
-    fun startNewGame(facultyNames: List<String>) {
+    fun startNewGame(facultyNames: List<String>, randomOrder: Boolean = true) {
         require(facultyNames.size in MIN_FACULTIES..MAX_FACULTIES) {
             "Es müssen $MIN_FACULTIES bis $MAX_FACULTIES Fakultäten sein."
         }
         require(facultyNames.none { it.isBlank() }) { "Namen dürfen nicht leer sein." }
         require(facultyNames.distinct().size == facultyNames.size) { "Namen müssen eindeutig sein." }
 
-        val game = FacultyGame(facultyNames.shuffled().map { Faculty(it) })
+        val names = if (randomOrder) facultyNames.shuffled() else facultyNames
+        val game = FacultyGame(names.map { Faculty(it) })
 
         game.drawStack.addAll(createDrawStack())
         game.faculties.forEach { faculty ->
@@ -43,13 +46,17 @@ class GameService(
     }
 
     /**
-     * Ends the current faculty's turn , and Starts the next turn or finishes the game.
+     * Ends the current faculty's turn.
+     * Starts the next turn or finishes the game.
+     *
      * @throws IllegalStateException if no game is running or the game is already over
      */
     fun endTurn() {
         val game = checkNotNull(rootService.currentGame) { "Es läuft kein Spiel." }
         check(game.endgameTurnsLeft != 0) { "Das Spiel ist bereits beendet." }
-
+        check(!rootService.playerActionService.hasPossibleAction()) {
+            "Der Zug kann erst beendet werden, wenn keine Aktion mehr möglich ist."
+        }
         updateEndgameCounter(game)
         if (isGameOver(game)) {
             endGame()
@@ -62,6 +69,11 @@ class GameService(
 
         onAllRefreshables { refreshAfterTurnChange(next) }
         onAllRefreshables { refreshAfterLog("${next.name} ist am Zug.") }
+        // Verklemmung: the new faculty cannot act at all, so it is skipped.
+        if (!rootService.playerActionService.hasPossibleAction()) {
+            onAllRefreshables { refreshAfterLog("${next.name} kann keine Aktion ausführen und wird übersprungen.") }
+            endTurn()
+        }
     }
 
     /** Creates all 52 cards in randomized order. */
@@ -71,7 +83,9 @@ class GameService(
         }.shuffled()
 
     /**
+     * Starts and updates the endgame countdown.
      * -1: endgame has not started, >0: remaining turns, 0: game has ended.
+     * Rule: the game ends when the draw stack is empty and every other faculty had one more turn.
      */
     private fun updateEndgameCounter(game: FacultyGame) {
         if (game.endgameTurnsLeft == -1 && game.drawStack.isEmpty()) {
@@ -94,6 +108,7 @@ class GameService(
 
     /**
      * Calculates the final score of every faculty.
+     * Faculties are sorted by total score, highest first.
      */
     private fun calculateFinalScores(): List<FinalScore> {
         val game = checkNotNull(rootService.currentGame)
@@ -125,19 +140,11 @@ class GameService(
             faculty.publications.count { it.suit == suit }
         }
 
-
     /**
-    * Calculates the cumulative majority bonus points for a single [Faculty] across all available research topics.
-    *
-    * Iterates through every existing [CardSuit] to determine if the given faculty holds either the
-    * highest (first place) or the second-highest (second place) publication volume globally compared to competitors.
-    * Only counts active non-zero publications toward the ranking thresholds.
-    *
-    * @param faculty The [Faculty] instance whose majority bonuses are being evaluated.
-    * @param publishedCounts A pre-calculated mapping containing the total number of published cards categorized
-    *        by each [Faculty] and their corresponding [CardSuit] counts.
-    * @return The total aggregated integer score earned from first and second-place majority achievements.
-    */
+     * Majority bonus per suit: [MAJORITY_FIRST] for the most published cards,
+     * [MAJORITY_SECOND] for the second most. Equal counts share the place
+     * (e.g. A=3, B=3, C=2 → A +5, B +5, C +2).
+     */
     private fun majorityBonus(
         faculty: Faculty,
         publishedCounts: Map<Faculty, Map<CardSuit, Int>>
@@ -157,9 +164,6 @@ class GameService(
         }
     }
 
-    /**
-     * Internal structural settings and mathematical constants governing game constraints and end-game scoring evaluation.
-     */
     private companion object {
         const val MIN_FACULTIES = 2
         const val MAX_FACULTIES = 4
@@ -169,7 +173,7 @@ class GameService(
         const val MAJORITY_FIRST = 5
         const val MAJORITY_SECOND = 2
         const val BREADTH_BONUS = 3
-        const val FOCUS_BONUS = 4
         const val FOCUS_MIN_CARDS = 8
+        const val FOCUS_BONUS = 4
     }
 }
