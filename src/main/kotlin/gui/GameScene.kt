@@ -54,6 +54,7 @@ class GameScene(private val rootService: RootService) :
     private val strategyHoverVisual = ColorVisual(40, 95, 70)
     private val endTurnVisual = ColorVisual(200, 255, 60)
     private val endTurnHoverVisual = ColorVisual(228, 255, 150)
+    private val endTurnDisabledVisual = ColorVisual(70, 95, 95)
 
     private fun font(size: Int, color: Color = white, bold: Boolean = false) =
         Font(size = size, color = color, fontWeight = if (bold) Font.FontWeight.BOLD else Font.FontWeight.NORMAL)
@@ -244,11 +245,14 @@ class GameScene(private val rootService: RootService) :
         }
 
         endTurnButton.onMouseEntered = {
-            endTurnButton.visual = endTurnHoverVisual
-            endTurnButton.scale = BUTTON_HOVER_SCALE
+            if (!endTurnButton.isDisabled) {
+                endTurnButton.visual = endTurnHoverVisual
+                endTurnButton.scale = BUTTON_HOVER_SCALE
+            }
         }
+
         endTurnButton.onMouseExited = {
-            endTurnButton.visual = endTurnVisual
+            endTurnButton.visual = if (endTurnButton.isDisabled) endTurnDisabledVisual else endTurnVisual
             endTurnButton.scale = 1.0
         }
     }
@@ -323,6 +327,9 @@ class GameScene(private val rootService: RootService) :
         drawResearch(current)
         drawHand(current)
         infoLabel.text = infoText(current)
+        endTurnButton.isDisabled = mode == Mode.STRATEGY_KEEP || rootService.playerActionService.hasPossibleAction()
+        endTurnButton.visual = if (endTurnButton.isDisabled) endTurnDisabledVisual else endTurnVisual
+        endTurnButton.scale = 1.0
     }
 
     private fun drawFaculties(faculties: List<Faculty>, current: Faculty) {
