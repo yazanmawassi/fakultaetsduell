@@ -165,8 +165,8 @@ class GameScene(private val rootService: RootService) :
     private val researchColumns = SUITS.indices.map { i ->
         Pane<ComponentView>(posX = 360 + i * 292, posY = 530, width = 280, height = 195, visual = lightVisual)
             .apply {
-                // US "Publizieren": hier runAction { rootService.playerActionService.publish(SUITS[i]) } aufrufen
-                onMouseClicked = { notConnected("Publizieren") }
+                // US "Publizieren":
+                onMouseClicked = { runAction { rootService.playerActionService.publish(SUITS[i]) } }
             }
     }
 
@@ -450,12 +450,19 @@ class GameScene(private val rootService: RootService) :
         }
     }
 
+    /**
+     * Renders cards in the central literature and connects the "Use Literature" action (2 AP).
+     *
+     * Clicking a card removes it from the central literature and moves it
+     * to the active faculty's matching research stack.
+     *
+     * @param cards Currently available [ResearchCard]s in central literature.
+     */
     private fun drawLiterature(cards: List<ResearchCard>) {
         literaturePane.clear()
         cards.forEachIndexed { i, card ->
-            // US "Literatur nutzen": hier runAction { rootService.playerActionService.useLiterature(card) } aufrufen
             literaturePane.add(cardLabel(card, i * 113, 5, 91, 140, { hasActionPoints(2) }) {
-                notConnected("Literatur nutzen")
+                runAction { rootService.playerActionService.useLiterature(card) }
             })
         }
     }
