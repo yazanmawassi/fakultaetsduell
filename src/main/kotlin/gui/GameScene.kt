@@ -136,11 +136,18 @@ class GameScene(private val rootService: RootService) :
 
     private val literaturePane = Pane<ComponentView>(posX = 525, posY = 280, width = 680, height = 150)
 
-    private val drawStackPane = Pane<ComponentView>(posX = 1225, posY = 272, width = 135, height = 165)
-        .apply {
-            // US "Neue Ideen gewinnen": hier runAction { rootService.playerActionService.drawIdea() } aufrufen
-            onMouseClicked = { notConnected("Neue Ideen gewinnen") }
+    /** Draw stack that allows the player to gain a new idea when permitted. */
+    private val drawStackPane = Pane<ComponentView>(
+        posX = 1225, posY = 272, width = 135, height = 165
+    ).apply {
+        onMouseClicked = {
+            if (canDrawIdea()) {
+                runAction {
+                    rootService.playerActionService.drawIdea()
+                }
+            }
         }
+    }
 
     private val drawStackCaption = Label(
         posX = 1215, posY = 432, width = 155, height = 18, text = "NACHZIEHSTAPEL",
