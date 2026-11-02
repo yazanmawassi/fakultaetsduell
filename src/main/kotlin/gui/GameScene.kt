@@ -446,7 +446,15 @@ class GameScene(private val rootService: RootService) :
                 ).apply {
                     // US "Konkurrenz ausbremsen": hier
                     // runAction { rootService.playerActionService.sabotage(opponent, suit) } aufrufen
-                    onMouseClicked = { notConnected("Konkurrenz ausbremsen") }
+                    onMouseClicked = {
+                        if (hasActionPoints(2) && stack.isNotEmpty()) {
+                            runAction {
+                                rootService.playerActionService.sabotage(opponent, suit)
+                            }
+                        } else {
+                            addLog("Sabotage nicht möglich: 2 AP und gegnerische Forschungskarten erforderlich.")
+                        }
+                    }
                 }
                 highlightOnHover(stackLabel, sabotageHoverVisual, { paperVisual }) {
                     hasActionPoints(2) && stack.isNotEmpty()
