@@ -537,14 +537,29 @@ class GameScene(private val rootService: RootService) :
 
     // ===================== Klicks =====================
 
+    /**
+     * Handles a hand card click depending on the current interaction mode.
+     *
+     * In normal mode, uses the card for research. The service validates the
+     * action, moves the card to the matching research stack, updates the
+     * central literature, and deducts one action point.
+     *
+     * During strategy adjustment, discards the selected card. If the player
+     * must choose one of the two drawn cards, displays a reminder instead.
+     *
+     * @param card the hand card clicked by the player
+     */
     private fun onHandCardClicked(card: ResearchCard) {
         when (mode) {
-            Mode.NORMAL -> {
-                // US "Forschung vorantreiben": hier runAction { rootService.playerActionService.research(card) } aufrufen
-                notConnected("Forschung vorantreiben")
+            Mode.NORMAL -> runAction {
+                rootService.playerActionService.research(card)
             }
-            Mode.STRATEGY_DISCARD -> runAction { rootService.playerActionService.startStrategy(card) }
-            Mode.STRATEGY_KEEP -> addLog("Bitte zuerst eine der zwei gezogenen Karten wählen.")
+            Mode.STRATEGY_DISCARD -> runAction {
+                rootService.playerActionService.startStrategy(card)
+            }
+            Mode.STRATEGY_KEEP -> addLog(
+                "Bitte zuerst eine der zwei gezogenen Karten wählen."
+            )
         }
     }
 
