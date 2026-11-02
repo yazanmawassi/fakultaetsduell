@@ -164,8 +164,8 @@ class GameScene(private val rootService: RootService) :
     private val researchColumns = SUITS.indices.map { i ->
         Pane<ComponentView>(posX = 360 + i * 292, posY = 530, width = 280, height = 195, visual = lightVisual)
             .apply {
-                // US "Publizieren": hier runAction { rootService.playerActionService.publish(SUITS[i]) } aufrufen
-                onMouseClicked = { notConnected("Publizieren") }
+                // US "Publizieren":
+                onMouseClicked = { runAction { rootService.playerActionService.publish(SUITS[i]) } }
             }
     }
 
