@@ -443,12 +443,19 @@ class GameScene(private val rootService: RootService) :
         }
     }
 
+    /**
+     * Renders cards in the central literature and connects the "Use Literature" action (2 AP).
+     *
+     * Clicking a card removes it from the central literature and moves it
+     * to the active faculty's matching research stack.
+     *
+     * @param cards Currently available [ResearchCard]s in central literature.
+     */
     private fun drawLiterature(cards: List<ResearchCard>) {
         literaturePane.clear()
         cards.forEachIndexed { i, card ->
-            // US "Literatur nutzen": hier runAction { rootService.playerActionService.useLiterature(card) } aufrufen
             literaturePane.add(cardLabel(card, i * 113, 5, 91, 140, { hasActionPoints(2) }) {
-                notConnected("Literatur nutzen")
+                runAction { rootService.playerActionService.useLiterature(card) }
             })
         }
     }
