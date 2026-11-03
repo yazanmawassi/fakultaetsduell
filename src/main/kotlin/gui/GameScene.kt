@@ -1,10 +1,11 @@
 package gui
-
 import entity.CardSuit
 import entity.Faculty
 import entity.ResearchCard
 import service.Refreshable
 import service.RootService
+import service.FinalScore
+import tools.aqua.bgw.animation.DelayAnimation
 import tools.aqua.bgw.components.ComponentView
 import tools.aqua.bgw.components.layoutviews.Pane
 import tools.aqua.bgw.components.uicomponents.Button
@@ -25,6 +26,7 @@ import tools.aqua.bgw.visual.Visual
  * The other actions are marked with a comment `// US "..."` that shows which
  * service call belongs there.
  */
+@Suppress("TooManyFunctions") // Refreshable callbacks keep the scene in sync with service events.
 class GameScene(private val rootService: RootService) :
     BoardGameScene(1920, 1080, background = ColorVisual(13, 43, 43)), Refreshable {
 
@@ -33,6 +35,8 @@ class GameScene(private val rootService: RootService) :
     private val cardImages = CardImageLoader()
     private var mode = Mode.NORMAL
     private var turnsPlayed = 0
+    private var turnTransitionActive = false
+    private var transitionGeneration = 0
     private val logMessages = mutableListOf<String>()
 
     // ===================== Farben & Schriften =====================
@@ -191,6 +195,26 @@ class GameScene(private val rootService: RootService) :
         posX = 690, posY = 300, width = 560, height = 230, visual = paperVisual
     ).apply { isVisible = false }
 
+    /** Covers the table and hides private cards during a turn transition. */
+    private val turnOverlay = Pane<ComponentView>(
+        posX = 0, posY = 0, width = 1920, height = 1080, visual = ColorVisual(13, 43, 43)
+    ).apply { isVisible = false }
+
+    private val turnOverlayTitle = Label(
+        posX = 460, posY = 340, width = 1000, height = 70,
+        text = "Dein Zug ist beendet!", font = font(36, white, true)
+    )
+
+    private val turnOverlayNext = Label(
+        posX = 360, posY = 430, width = 1200, height = 110,
+        text = "", font = font(28, white), isWrapText = true
+    )
+
+    private val turnOverlayCountdown = Label(
+        posX = 760, posY = 570, width = 400, height = 120,
+        text = "", font = font(72, lime, true)
+    )
+
     // ===================== Rechts =====================
 
     private val apBox = Label(posX = 1565, posY = 100, width = 330, height = 80, visual = cardVisual)
@@ -233,6 +257,10 @@ class GameScene(private val rootService: RootService) :
         )
         researchColumns.forEach { addComponents(it) }
         addComponents(strategyPane)
+        turnOverlay.add(turnOverlayTitle)
+        turnOverlay.add(turnOverlayNext)
+        turnOverlay.add(turnOverlayCountdown)
+        addComponents(turnOverlay)
         setUpHoverEffects()
     }
 
@@ -267,6 +295,7 @@ class GameScene(private val rootService: RootService) :
     // ===================== Refreshable =====================
 
     override fun refreshAfterStartGame() {
+        cancelTurnTransition()
         mode = Mode.NORMAL
         turnsPlayed = 0
         strategyPane.isVisible = false
@@ -282,6 +311,7 @@ class GameScene(private val rootService: RootService) :
     override fun refreshAfterUseLiterature(faculty: Faculty, card: ResearchCard) = redraw()
 
     override fun refreshAfterTurnChange(nextFaculty: Faculty) {
+        cancelTurnTransition()
         turnsPlayed++
         mode = Mode.NORMAL
         strategyPane.isVisible = false
@@ -314,6 +344,56 @@ class GameScene(private val rootService: RootService) :
 
     override fun refreshAfterLog(message: String) = addLog(message)
 
+    override fun refreshAfterGameEnd(scores: List<FinalScore>) {
+        cancelTurnTransition()
+    }
+
+    /** Shows a single countdown after the last AP has been spent and strategy selection is complete. */
+    override fun refreshAfterActionPointsDepleted(faculty: Faculty) {
+        val game = rootService.currentGame ?: return
+        if (turnTransitionActive || activeFaculty() !== faculty || faculty.actionPoints != 0) return
+        if (game.pendingStrategyCards.isNotEmpty() || game.endgameTurnsLeft == 0) return
+
+        turnTransitionActive = true
+        val generation = ++transitionGeneration
+        val next = game.faculties[(game.facultyAtTurn + 1) % game.faculties.size]
+        turnOverlayNext.text = if (game.endgameTurnsLeft == 1) {
+            "Das Spiel ist beendet. Gleich erscheint die Auswertung."
+        } else {
+            "Nächster Spieler: ${next.name}"
+        }
+        turnOverlay.isVisible = true
+        endTurnButton.isDisabled = true
+        endTurnButton.visual = endTurnDisabledVisual
+        lock()
+        countDownTurn(TURN_COUNTDOWN_SECONDS, generation, faculty)
+    }
+
+    /** Schedules one non-blocking countdown step and ignores callbacks from an obsolete transition. */
+    private fun countDownTurn(seconds: Int, generation: Int, faculty: Faculty) {
+        turnOverlayCountdown.text = seconds.toString()
+        playAnimation(DelayAnimation(COUNTDOWN_STEP_MILLIS).apply {
+            onFinished = {
+                if (turnTransitionActive && generation == transitionGeneration && activeFaculty() === faculty) {
+                    if (seconds > 1) {
+                        countDownTurn(seconds - 1, generation, faculty)
+                    } else {
+                        cancelTurnTransition()
+                        runAction { rootService.gameService.endTurn() }
+                    }
+                }
+            }
+        })
+    }
+
+    /** Invalidates pending callbacks when a new game, another turn or the end screen is shown. */
+    private fun cancelTurnTransition() {
+        transitionGeneration++
+        turnTransitionActive = false
+        turnOverlay.isVisible = false
+        unlock()
+    }
+
     // ===================== Zeichnen =====================
 
     /** Rebuilds the whole table from the current game state. */
@@ -334,7 +414,8 @@ class GameScene(private val rootService: RootService) :
         drawResearch(current)
         drawHand(current)
         infoLabel.text = infoText(current)
-        endTurnButton.isDisabled = mode == Mode.STRATEGY_KEEP || rootService.playerActionService.hasPossibleAction()
+        endTurnButton.isDisabled = turnTransitionActive || mode == Mode.STRATEGY_KEEP ||
+            rootService.playerActionService.hasPossibleAction()
         endTurnButton.visual = if (endTurnButton.isDisabled) endTurnDisabledVisual else endTurnVisual
         endTurnButton.scale = 1.0
     }
@@ -585,6 +666,7 @@ class GameScene(private val rootService: RootService) :
     }
 
     private fun onStrategyClicked() {
+        if (turnTransitionActive) return
         mode = when (mode) {
             Mode.NORMAL -> Mode.STRATEGY_DISCARD
             Mode.STRATEGY_DISCARD -> Mode.NORMAL
@@ -595,6 +677,7 @@ class GameScene(private val rootService: RootService) :
 
     /** Runs a service action and shows rule violations in the log instead of crashing. */
     private fun runAction(action: () -> Unit) {
+        if (turnTransitionActive) return
         try {
             action()
         } catch (e: IllegalStateException) {
@@ -710,6 +793,8 @@ class GameScene(private val rootService: RootService) :
         val LONG_NAMES = listOf(
             "Künstliche Intelligenz", "IT-Sicherheit", "Software-Engineering", "Theoretische Informatik"
         )
+        const val TURN_COUNTDOWN_SECONDS = 3
+        const val COUNTDOWN_STEP_MILLIS = 1000
         const val MAX_LOG_LINES = 20
         const val MAX_HAND_BEFORE_DRAW = 5
         const val HOVER_LIFT = 14.0

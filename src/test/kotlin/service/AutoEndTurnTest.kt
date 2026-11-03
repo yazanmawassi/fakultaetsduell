@@ -7,7 +7,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * Tests for the automatic end of a turn and the skipping of blocked faculties.
+ * Tests for deferred turn completion and the skipping of blocked faculties.
  */
 class AutoEndTurnTest {
 
@@ -28,12 +28,15 @@ class AutoEndTurnTest {
         assertEquals(0, game().facultyAtTurn)
     }
 
-    /** After the last action point is used, the next faculty is at turn. */
+    /** Exhausting AP waits for the GUI countdown before the turn is explicitly completed. */
     @Test
-    fun `turn ends automatically after last action point`() {
+    fun `turn waits for countdown after last action point`() {
         val faculty = game().faculties[0]
         rootService.playerActionService.research(faculty.handCards.first())
         rootService.playerActionService.research(faculty.handCards.first())
+        assertEquals(0, game().facultyAtTurn)
+        assertEquals(0, faculty.actionPoints)
+        rootService.gameService.endTurn()
         assertEquals(1, game().facultyAtTurn)
         assertEquals(2, game().faculties[1].actionPoints)
     }

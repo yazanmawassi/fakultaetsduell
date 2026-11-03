@@ -94,6 +94,14 @@ interface Refreshable {
     fun refreshAfterTurnChange(nextFaculty: Faculty) {}
 
     /**
+     * Requests a GUI countdown before ending a turn with no action points left.
+     * A pending strategy selection must be completed before this event is sent.
+     *
+     * @param faculty the faculty whose action points have been exhausted
+     */
+    fun refreshAfterActionPointsDepleted(faculty: Faculty) {}
+
+    /**
      * Triggered when the final endgame conditions are met and computations are complete.
      * Notifies the UI to stop active gameplay interaction and render the final scoring board overlay.
      *
