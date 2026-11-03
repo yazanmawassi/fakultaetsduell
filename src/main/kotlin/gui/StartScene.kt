@@ -62,7 +62,7 @@ class StartScene(
     }
 
     private val reorderHint = Label(
-        width = 300,
+        width = 350,
         height = 40,
         posX = 1255,
         posY = 500,
@@ -320,20 +320,22 @@ class StartScene(
      * @param removeButton the remove button associated with [field]
      */
     private fun removeNameField(field: TextField, removeButton: Button) {
-        // Mindestens zwei Namensfelder behalten
         if (nameFields.size <= 2) return
 
-        removeComponents(field, removeButton)
-        nameFields.remove(field)
-        nameRemoveButtons.remove(removeButton)
+        val index = nameFields.indexOf(field)
+        if (index == -1) return
 
-        // Verbleibende Felder nach oben verschieben
-        nameFields.forEachIndexed { index, nameField ->
-            val rowY = 480.0 + index * 70.0
-            nameField.posY = rowY
-            nameRemoveButtons[index].posY = rowY + 9
-        }
+        val upButton = nameUpButtons[index]
+        val downButton = nameDownButtons[index]
 
+        removeComponents(field, removeButton, upButton, downButton)
+
+        nameFields.removeAt(index)
+        nameRemoveButtons.removeAt(index)
+        nameUpButtons.removeAt(index)
+        nameDownButtons.removeAt(index)
+
+        repositionNameFields()
         addFacultyButton.isDisabled = nameFields.size >= 4
     }
 
