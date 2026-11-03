@@ -1,60 +1,74 @@
+
 package gui
 
+import service.Refreshable
 import service.RootService
+import service.FinalScore
 import tools.aqua.bgw.core.BoardGameApplication
 
 /**
- * Die Hauptanwendungsklasse für das SoPra-Brettspiel.
- *
- * Diese Klasse initialisiert den zentralen [RootService], stellt die initiale [StartScene] bereit
- * und bietet die offiziellen Koordinations-Methoden für den Wechsel zwischen dem Setup-Menü,
- * dem aktiven Spielfeld und dem finalen Ergebnis-Bildschirm.
+ * Main application managing the start, game and end scenes.
  */
-class SopraApplication : BoardGameApplication("SoPra Game") {
+class SopraApplication :
+    BoardGameApplication("Exzellente Informatik-Forschung"),
+    Refreshable {
 
-    /** Der zentrale RootService, der von allen Szenen der Anwendung gemeinsam genutzt wird. */
-    val rootService = RootService()
+    /** Central service managing the game logic. */
+    val rootService: RootService = RootService()
 
-    /** Das Start-Menü, das zur Konfiguration der Spielernamen vor dem Spielstart dient. */
+    /** Start menu for entering faculty names. */
     private val startScene = StartScene(this)
 
+    /** Main game scene. */
+    private val gameScene = GameScene(rootService)
+
+    /** End scene displaying the final scores. */
+    private val endGameScene = EndGameScene(
+        onGameEnded = { showEndGameScene() },
+        onBackToMenu = { showGameScene(startScene) }
+    )
+
     init {
-        // Die Anwendung startet standardmäßig mit der Konfigurations-Ansicht (StartScene)
+        rootService.addRefreshables(
+            this,
+            gameScene,
+            endGameScene
+        )
+
         showGameScene(startScene)
     }
 
     /**
-     * Schaltet auf die Hauptspiel-Ansicht (GameScene) um, nachdem die Spieler eingerichtet wurden.
-     *
-     * Diese Methode initialisiert die Live-Instanz der [GameScene] dynamisch mit den eingegebenen
-     * Namen, registriert das neue Spielfeld im [RootService] als [service.Refreshable] für automatische
-     * UI-Updates und blendet das Spielfeld für die Benutzer ein.
-     *
-     * @param names Die Liste der bereinigten Spielernamen, die das Spiel starten.
+     * Starts a new game with the selected faculty names.
      */
-    fun showMainGameScene(names: List<String>) {
-        println("Spieler starten das Spiel: ${names.joinToString()}")
+    fun showMainGameScene(
+        names: List<String>,
+        randomOrder: Boolean = false
+    ) {
+        rootService.gameService.startNewGame(
+            names,
+            randomOrder
+        )
+    }
 
-        // 1. Instanziierung des echten, interaktiven Spielfelds (GameScene)
-        val gameScene = GameScene(this)
-
-        // 2. Registrierung der Szene im Service-Layer, damit Karten-Updates live gerendert werden
-        rootService.addRefreshable(gameScene)
-
-        // 3. Sichtbarer Wechsel des Fensters auf die aktive Spieloberfläche
+    /**
+     * Displays the game scene after the game starts.
+     */
+    override fun refreshAfterStartGame() {
         showGameScene(gameScene)
     }
 
     /**
-     * Schaltet auf den finalen Ergebnis-Bildschirm (EndScene) um, sobald die Auswertung
-     * des Semesters ansteht und die Endrunden-Bedingungen erfüllt sind.
-     *
-     * Erstellt eine frische Instanz der [EndScene], um die finalen Punkteberechnungen,
-     * Mehrheitsboni und das endgültige Ranking fehlerfrei anzuzeigen.
+     * Displays the end scene when the game finishes.
      */
-    fun showEndScene() {
-        // 4. Instanziierung und Anzeige des Sieger- und Scoreboard-Bildschirms
-        val endScene = EndScene(this)
-        showGameScene(endScene)
+    override fun refreshAfterGameEnd(scores: List<FinalScore>) {
+        showEndGameScene()
+    }
+
+    /**
+     * Switches to the final result scene.
+     */
+    fun showEndGameScene() {
+        showGameScene(endGameScene)
     }
 }

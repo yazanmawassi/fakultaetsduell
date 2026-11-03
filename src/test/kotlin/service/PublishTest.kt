@@ -75,6 +75,109 @@ class PublishTest {
     }
 
     /**
+     * Test 1.2: Tests a standard successful publication scenario without bonus.
+     * Verifies that exactly 2 AP are deducted, 5 research points are awarded for 3 cards,
+     * and the stack is cleared.
+     */
+    @Test
+    fun testPublishSuccessWithThreeCards(){
+        rootService.gameService.startNewGame(listOf("A", "B"))
+        val game = assertNotNull(rootService.currentGame)
+        val playerA = game.faculties[0]
+        val playerB = game.faculties[1]
+
+        playerA.actionPoints = 2
+        val suit = CardSuit.HEARTS
+        val stackA = playerA.researchActivity[suit]
+
+        val testStack = assertNotNull(stackA)
+        testStack.add(createCard(suit))
+        testStack.add(createCard(suit))
+        testStack.add(createCard(suit))
+
+
+        // Player B already published here to block the first-to-publish bonus
+        playerB.publications.add(createCard(suit))
+
+        rootService.playerActionService.publish(suit)
+
+        assertEquals(0, playerA.actionPoints, "Exactly 2 AP must be deducted.")
+        assertEquals(5, playerA.researchPoints, "Exactly 5 research points must be awarded for 3 cards.")
+        assertTrue(testStack.isEmpty(), "The active research stack must be cleared after publication.")
+
+    }
+
+    /**
+     * Test 1.3: Tests a standard successful publication scenario without bonus.
+     * Verifies that exactly 2 AP are deducted, 7 research points are awarded for 4 cards,
+     * and the stack is cleared.
+     */
+    @Test
+    fun testPublishSuccessWithFourCards(){
+        rootService.gameService.startNewGame(listOf("A", "B"))
+        val game = assertNotNull(rootService.currentGame)
+        val playerA = game.faculties[0]
+        val playerB = game.faculties[1]
+
+        playerA.actionPoints = 2
+        val suit = CardSuit.HEARTS
+        val stackA = playerA.researchActivity[suit]
+
+        val testStack = assertNotNull(stackA)
+        testStack.add(createCard(suit))
+        testStack.add(createCard(suit))
+        testStack.add(createCard(suit))
+        testStack.add(createCard(suit))
+
+
+        // Player B already published here to block the first-to-publish bonus
+        playerB.publications.add(createCard(suit))
+
+        rootService.playerActionService.publish(suit)
+
+        assertEquals(0, playerA.actionPoints, "Exactly 2 AP must be deducted.")
+        assertEquals(7, playerA.researchPoints, "Exactly 7 research points must be awarded for 4 cards.")
+        assertTrue(testStack.isEmpty(), "The active research stack must be cleared after publication.")
+
+    }
+
+    /**
+     * Test 1.4: Tests a standard successful publication scenario without bonus.
+     * Verifies that exactly 2 AP are deducted, 9 research points are awarded for 5 cards,
+     * and the stack is cleared.
+     */
+    @Test
+    fun testPublishSuccessWithFiveCards(){
+        rootService.gameService.startNewGame(listOf("A", "B"))
+        val game = assertNotNull(rootService.currentGame)
+        val playerA = game.faculties[0]
+        val playerB = game.faculties[1]
+
+        playerA.actionPoints = 2
+        val suit = CardSuit.HEARTS
+        val stackA = playerA.researchActivity[suit]
+
+        val testStack = assertNotNull(stackA)
+        testStack.add(createCard(suit))
+        testStack.add(createCard(suit))
+        testStack.add(createCard(suit))
+        testStack.add(createCard(suit))
+        testStack.add(createCard(suit))
+
+
+        // Player B already published here to block the first-to-publish bonus
+        playerB.publications.add(createCard(suit))
+
+        rootService.playerActionService.publish(suit)
+
+        assertEquals(0, playerA.actionPoints, "Exactly 2 AP must be deducted.")
+        assertEquals(9, playerA.researchPoints, "Exactly 9 research points must be awarded for 5 cards.")
+        assertTrue(testStack.isEmpty(), "The active research stack must be cleared after publication.")
+
+    }
+
+
+    /**
      * Test 2: Tests a successful publication that triggers the First-to-Publish bonus point.
      * Verifies that the player receives 4 points instead of 3 (3 base points + 1 bonus point).
      */
@@ -150,4 +253,27 @@ class PublishTest {
             rootService.playerActionService.publish(suit)
         }
     }
+
+    /**
+     * Test 6 : Tests that publishing fails with an [IllegalStateException] if the game
+    * turns have already reached zero (endgame state reached).
+    */
+    @Test
+    fun testPublishFailsWhenGameIsAlreadyEnded() {
+        val rootService = RootService()
+        val gameService = rootService.gameService
+
+        // 1. Start a game to set up the initial configuration state
+        gameService.startNewGame(listOf("Ada", "Linus"))
+        val game = checkNotNull(rootService.currentGame)
+
+
+        game.endgameTurnsLeft = 0
+
+
+        assertFailsWith<IllegalStateException> {
+            rootService.playerActionService.publish(CardSuit.CLUBS)
+        }
+    }
 }
+
