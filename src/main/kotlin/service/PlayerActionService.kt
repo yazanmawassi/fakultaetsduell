@@ -55,7 +55,7 @@ class PlayerActionService(private val rootService: RootService) : AbstractRefres
             refreshAfterLog("${faculty.name} treibt Forschung voran.")
         }
 
-        endTurnIfNoActionLeft()
+        notifyIfActionPointsDepleted()
     }
 
     /**
@@ -109,7 +109,7 @@ class PlayerActionService(private val rootService: RootService) : AbstractRefres
         }
 
 
-        endTurnIfNoActionLeft()
+        notifyIfActionPointsDepleted()
     }
 
     /** First step of "Strategie anpassen": discards [discard] and draws two cards. */
@@ -211,7 +211,7 @@ class PlayerActionService(private val rootService: RootService) : AbstractRefres
             refreshAfterStrategyEnd(currentFaculty)
         }
 
-        endTurnIfNoActionLeft()
+        notifyIfActionPointsDepleted()
     }
 
 
@@ -293,7 +293,7 @@ class PlayerActionService(private val rootService: RootService) : AbstractRefres
             refreshAfterPublish(activeFaculty, area, earnedPoints)
         }
 
-        endTurnIfNoActionLeft()
+        notifyIfActionPointsDepleted()
     }
     /** Removes the top card of [target]'s stack in [area] ("Konkurrenz ausbremsen"). */
 
@@ -348,7 +348,7 @@ class PlayerActionService(private val rootService: RootService) : AbstractRefres
             refreshAfterSabotage(target, area)
         }
 
-        endTurnIfNoActionLeft()
+        notifyIfActionPointsDepleted()
     }
 
     /**
@@ -386,15 +386,16 @@ class PlayerActionService(private val rootService: RootService) : AbstractRefres
         faculty.actionPoints -= 2
 
         onAllRefreshables {
+            refreshAfterUseLiterature(faculty, card)
             refreshAfterLog("${faculty.name} nutzt die zentrale Literatur.")
         }
 
-        endTurnIfNoActionLeft()
+        notifyIfActionPointsDepleted()
     }
     /**
      * Checks whether the active faculty can still perform at least one action.
      *
-     * Used to end a turn automatically and to detect a deadlock in the last round
+     * Used to enable manual turn completion and to detect a deadlock in the last round
      * (action points left, but no action possible).
      *
      * @return true if at least one action is allowed, false otherwise
@@ -426,10 +427,12 @@ class PlayerActionService(private val rootService: RootService) : AbstractRefres
                 canPublish || canSabotage || canUseLiterature
     }
 
-    /** Ends the turn automatically if the active faculty cannot do any action anymore. */
-    private fun endTurnIfNoActionLeft() {
-        if (!hasPossibleAction()) {
-            rootService.gameService.endTurn()
+    /** Requests a countdown at zero AP; deadlocks with AP left wait for the end-turn button. */
+    private fun notifyIfActionPointsDepleted() {
+        val game = checkNotNull(rootService.currentGame) { "Es läuft kein Spiel." }
+        val faculty = game.faculties[game.facultyAtTurn]
+        if (faculty.actionPoints == 0 && game.pendingStrategyCards.isEmpty()) {
+            onAllRefreshables { refreshAfterActionPointsDepleted(faculty) }
         }
     }
 
