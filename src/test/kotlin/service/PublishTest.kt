@@ -267,10 +267,10 @@ class PublishTest {
         gameService.startNewGame(listOf("Ada", "Linus"))
         val game = checkNotNull(rootService.currentGame)
 
-        // 2. 🟢 خدعة التست: إجبار اللعبة على الوصول لشرط النهاية (تصفير الـ Turns)
+
         game.endgameTurnsLeft = 0
 
-        // 3. التحقق من أن السيرفر سيرفض النشر ويرمي الـ Exception المطلوب لحماية اللعبة
+
         assertFailsWith<IllegalStateException> {
             rootService.playerActionService.publish(CardSuit.CLUBS)
         }
