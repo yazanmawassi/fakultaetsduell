@@ -202,8 +202,8 @@ class StartScene(
         }
 
 
-        addNameField("Ada")
-        addNameField("Linus")
+        addNameField()
+        addNameField()
 
         addComponents(
             reorderHint ,
@@ -240,10 +240,8 @@ class StartScene(
 
     /**
      * Adds a player name field to the scene.
-     *
-     * @param initialText the initial text displayed in the new field
      */
-    private fun addNameField(initialText: String = "") {
+    private fun addNameField() {
         if (nameFields.size >= 4) return
 
         /** The position index used to place the new field below existing fields. */
@@ -256,7 +254,8 @@ class StartScene(
             height = 50,
             posX = 1253,
             posY = rowY ,
-            text = initialText
+            text = "" ,
+            prompt = "Name Eingeben"
         ).apply {
             visual = nameFieldColor
             font = whiteFont
