@@ -307,6 +307,10 @@ class StartScene(
         nameDownButtons.add(downButton)
         addComponents(field, removeButton  , upButton, downButton )
 
+        val arrowsDisabled = turnOrder == TurnOrder.RANDOM
+        upButton.isDisabled = arrowsDisabled
+        downButton.isDisabled = arrowsDisabled
+
         addFacultyButton.isDisabled = nameFields.size >= 4
     }
 
@@ -400,6 +404,11 @@ class StartScene(
             randomButton.visual = dark
             randomButton.font = whiteFont
         }
+
+        val manualSelected = turnOrder == TurnOrder.MANUAL
+
+        nameUpButtons.forEach { it.isDisabled = !manualSelected }
+        nameDownButtons.forEach { it.isDisabled = !manualSelected }
     }
 
     /**
