@@ -331,6 +331,14 @@ class GameScene(private val rootService: RootService) :
         logLabel.text = ""
         actionsThisTurn.clear()
         pointsAtTurnStart = rootService.currentGame?.faculties?.get(0)?.researchPoints ?: 0
+
+        val game = rootService.currentGame
+        val firstFaculty = game?.faculties?.get(0)
+
+        addLog("SPIEL GESTARTET ")
+        if (firstFaculty != null) {
+            addLog("═══ ${firstFaculty.name} BEGINNT ═══")
+        }
         redraw()
     }
 
@@ -366,6 +374,8 @@ class GameScene(private val rootService: RootService) :
         strategyPane.isVisible = false
         actionsThisTurn.clear()
         pointsAtTurnStart = nextFaculty.researchPoints
+        addLog("")
+        addLog("═══ ${nextFaculty.name} IST AM ZUG ═══")
         redraw()
     }
 
