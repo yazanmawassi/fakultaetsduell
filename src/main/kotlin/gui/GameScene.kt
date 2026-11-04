@@ -16,6 +16,7 @@ import tools.aqua.bgw.core.Color
 import tools.aqua.bgw.util.Font
 import tools.aqua.bgw.visual.ColorVisual
 import tools.aqua.bgw.visual.Visual
+import tools.aqua.bgw.components.uicomponents.TextArea
 
 /**
  * Main game screen: faculties and the action "Strategie anpassen" on the left,
@@ -38,6 +39,8 @@ class GameScene(private val rootService: RootService) :
     private var turnTransitionActive = false
     private var transitionGeneration = 0
     private val logMessages = mutableListOf<String>()
+    private var pointsAtTurnStart = 0
+    private val actionsThisTurn = mutableListOf<String>()
 
     // ===================== Farben & Schriften =====================
 
@@ -201,17 +204,37 @@ class GameScene(private val rootService: RootService) :
     ).apply { isVisible = false }
 
     private val turnOverlayTitle = Label(
-        posX = 460, posY = 340, width = 1000, height = 70,
-        text = "Dein Zug ist beendet!", font = font(36, white, true)
+        posX = 460, posY = 200, width = 1000, height = 70,
+        text = "Dein Zug ist beendet!", font = font(42, white, true)
     )
 
-    private val turnOverlayNext = Label(
-        posX = 360, posY = 430, width = 1200, height = 110,
-        text = "", font = font(28, white), isWrapText = true
+    private val turnOverlaySummaryTitle = Label(
+        posX = 360, posY = 300, width = 1200, height = 40,
+        text = "Aktionen in diesem Zug:", font = font(28, white)
+    )
+
+    private val turnOverlaySummaryText = Label(
+        posX = 360, posY = 350, width = 1200, height = 80,
+        text = "", font = font(24, white), isWrapText = true
+    )
+
+    private val turnOverlayPoints = Label(
+        posX = 460, posY = 460, width = 1000, height = 50,
+        text = "", font = font(32, lime, true)
+    )
+
+    private val turnOverlayNextTitle = Label(
+        posX = 360, posY = 580, width = 1200, height = 40,
+        text = "", font = font(28, white)
+    )
+
+    private val turnOverlayNextName = Label(
+        posX = 360, posY = 630, width = 1200, height = 50,
+        text = "", font = font(38, lime, true)
     )
 
     private val turnOverlayCountdown = Label(
-        posX = 760, posY = 570, width = 400, height = 120,
+        posX = 760, posY = 740, width = 400, height = 120,
         text = "", font = font(72, lime, true)
     )
 
@@ -234,10 +257,12 @@ class GameScene(private val rootService: RootService) :
         font = font(14, muted, true), alignment = Alignment.CENTER_LEFT
     )
 
-    private val logLabel = Label(
+    private val logLabel = TextArea(
         posX = 1565, posY = 230, width = 330, height = 640, text = "",
-        font = font(13, white), alignment = Alignment.TOP_LEFT, isWrapText = true, visual = cardVisual
-    )
+        font = font(13, white), visual = cardVisual
+    ).apply {
+        isReadonly = true
+    }
 
     private val endTurnButton = Button(
         posX = 1565, posY = 900, width = 330, height = 70, text = "ZUG BEENDEN  →",
@@ -258,10 +283,13 @@ class GameScene(private val rootService: RootService) :
         researchColumns.forEach { addComponents(it) }
         addComponents(strategyPane)
         turnOverlay.add(turnOverlayTitle)
-        turnOverlay.add(turnOverlayNext)
+        turnOverlay.add(turnOverlaySummaryTitle)
+        turnOverlay.add(turnOverlaySummaryText)
+        turnOverlay.add(turnOverlayPoints)
+        turnOverlay.add(turnOverlayNextTitle)
+        turnOverlay.add(turnOverlayNextName)
         turnOverlay.add(turnOverlayCountdown)
         addComponents(turnOverlay)
-        setUpHoverEffects()
     }
 
     /** Hover effects for the elements that exist the whole time (not rebuilt in [redraw]). */
@@ -301,20 +329,43 @@ class GameScene(private val rootService: RootService) :
         strategyPane.isVisible = false
         logMessages.clear()
         logLabel.text = ""
+        actionsThisTurn.clear()
+        pointsAtTurnStart = rootService.currentGame?.faculties?.get(0)?.researchPoints ?: 0
         redraw()
     }
 
-    override fun refreshAfterResearch(faculty: Faculty) = redraw()
-    override fun refreshAfterDrawIdea(faculty: Faculty) = redraw()
-    override fun refreshAfterPublish(faculty: Faculty, area: CardSuit, points: Int) = redraw()
-    override fun refreshAfterSabotage(target: Faculty, area: CardSuit) = redraw()
-    override fun refreshAfterUseLiterature(faculty: Faculty, card: ResearchCard) = redraw()
+    override fun refreshAfterResearch(faculty: Faculty) {
+        actionsThisTurn.add("Forschung vorangetrieben")
+        redraw()
+    }
+
+    override fun refreshAfterDrawIdea(faculty: Faculty) {
+        actionsThisTurn.add("Neue Idee gewonnen")
+        redraw()
+    }
+
+    override fun refreshAfterPublish(faculty: Faculty, area: CardSuit, points: Int) {
+        actionsThisTurn.add("Publiziert ($area)")
+        redraw()
+    }
+
+    override fun refreshAfterSabotage(target: Faculty, area: CardSuit) {
+        actionsThisTurn.add("Konkurrenz ausgebremst")
+        redraw()
+    }
+
+    override fun refreshAfterUseLiterature(faculty: Faculty, card: ResearchCard) {
+        actionsThisTurn.add("Literatur genutzt")
+        redraw()
+    }
 
     override fun refreshAfterTurnChange(nextFaculty: Faculty) {
         cancelTurnTransition()
         turnsPlayed++
         mode = Mode.NORMAL
         strategyPane.isVisible = false
+        actionsThisTurn.clear()
+        pointsAtTurnStart = nextFaculty.researchPoints
         redraw()
     }
 
@@ -339,6 +390,7 @@ class GameScene(private val rootService: RootService) :
     override fun refreshAfterStrategyEnd(faculty: Faculty) {
         mode = Mode.NORMAL
         strategyPane.isVisible = false
+        actionsThisTurn.add("Strategie angepasst")
         redraw()
     }
 
@@ -357,11 +409,26 @@ class GameScene(private val rootService: RootService) :
         turnTransitionActive = true
         val generation = ++transitionGeneration
         val next = game.faculties[(game.facultyAtTurn + 1) % game.faculties.size]
-        turnOverlayNext.text = if (game.endgameTurnsLeft == 1) {
-            "Das Spiel ist beendet. Gleich erscheint die Auswertung."
+
+        val pointsGained = faculty.researchPoints - pointsAtTurnStart
+        turnOverlayPoints.text = "+$pointsGained Punkte in diesem Zug"
+
+        if (actionsThisTurn.isEmpty()) {
+            turnOverlaySummaryText.text = "Keine"
         } else {
-            "Nächster Spieler: ${next.name}"
+            turnOverlaySummaryText.text = actionsThisTurn.joinToString("  •  ")
         }
+
+        if (game.endgameTurnsLeft == 1) {
+            turnOverlayNextTitle.text = "Das Spiel ist beendet."
+            turnOverlayNextName.text = "Gleich erscheint die Auswertung."
+            turnOverlayNextName.font = font(28, white)
+        } else {
+            turnOverlayNextTitle.text = "Nächster Spieler:"
+            turnOverlayNextName.text = next.name
+            turnOverlayNextName.font = font(38, lime, true)
+        }
+
         turnOverlay.isVisible = true
         endTurnButton.isDisabled = true
         endTurnButton.visual = endTurnDisabledVisual
@@ -790,8 +857,8 @@ class GameScene(private val rootService: RootService) :
     private fun initials(faculty: Faculty) = faculty.name.take(2).uppercase()
 
     private fun addLog(message: String) {
-        logMessages.add(0, message)
-        if (logMessages.size > MAX_LOG_LINES) logMessages.removeLast()
+        logMessages.add(message)
+        if (logMessages.size > 100) logMessages.removeFirst()
         logLabel.text = logMessages.joinToString("\n")
     }
 
@@ -803,7 +870,7 @@ class GameScene(private val rootService: RootService) :
         )
         const val TURN_COUNTDOWN_SECONDS = 3
         const val COUNTDOWN_STEP_MILLIS = 1000
-        const val MAX_LOG_LINES = 20
+        //const val MAX_LOG_LINES = 20
         const val MAX_HAND_BEFORE_DRAW = 5
         const val HOVER_LIFT = 14.0
         const val HOVER_SCALE = 1.06

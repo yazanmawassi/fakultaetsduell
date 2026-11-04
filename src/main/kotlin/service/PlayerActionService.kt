@@ -52,7 +52,7 @@ class PlayerActionService(private val rootService: RootService) : AbstractRefres
         }
 
         onAllRefreshables {
-            refreshAfterLog("${faculty.name} treibt Forschung voran.")
+            refreshAfterLog("▶ ${faculty.name} treibt Forschung voran.")
         }
 
         notifyIfActionPointsDepleted()
@@ -106,6 +106,7 @@ class PlayerActionService(private val rootService: RootService) : AbstractRefres
 
         onAllRefreshables {
             refreshAfterDrawIdea(activeFaculty)
+            refreshAfterLog("▶ ${activeFaculty.name} zieht eine neue Idee vom Nachziehstapel.")
         }
 
 
@@ -168,6 +169,7 @@ class PlayerActionService(private val rootService: RootService) : AbstractRefres
         // 12. Notify GUI
         onAllRefreshables {
             refreshAfterStrategyStart(drawnCards)
+            refreshAfterLog("▶ ${currentFaculty.name} passt die Strategie an und zieht 2 Karten.")
         }
     }
 
@@ -209,6 +211,7 @@ class PlayerActionService(private val rootService: RootService) : AbstractRefres
         // 9. Update GUI
         onAllRefreshables {
             refreshAfterStrategyEnd(currentFaculty)
+            refreshAfterLog("▶ ${currentFaculty.name} hat die Strategieauswahl beendet.")
         }
 
         notifyIfActionPointsDepleted()
@@ -291,6 +294,7 @@ class PlayerActionService(private val rootService: RootService) : AbstractRefres
         // 7. Phase 3: Notify the user interface with the calculated total points
         onAllRefreshables {
             refreshAfterPublish(activeFaculty, area, earnedPoints)
+            refreshAfterLog("▶ ${activeFaculty.name} publiziert im Bereich $area und erhält $earnedPoints Punkte.")
         }
 
         notifyIfActionPointsDepleted()
@@ -346,6 +350,7 @@ class PlayerActionService(private val rootService: RootService) : AbstractRefres
         // 11. Notify GUI
         onAllRefreshables {
             refreshAfterSabotage(target, area)
+            refreshAfterLog("▶ ${currentFaculty.name} bremst die Konkurrenz (${target.name}) im Bereich $area aus.")
         }
 
         notifyIfActionPointsDepleted()
@@ -387,7 +392,7 @@ class PlayerActionService(private val rootService: RootService) : AbstractRefres
 
         onAllRefreshables {
             refreshAfterUseLiterature(faculty, card)
-            refreshAfterLog("${faculty.name} nutzt die zentrale Literatur.")
+            refreshAfterLog("▶ ${faculty.name} nutzt die zentrale Literatur.")
         }
 
         notifyIfActionPointsDepleted()
