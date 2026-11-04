@@ -42,7 +42,6 @@ class GameService(
         rootService.currentGame = game
 
         onAllRefreshables { refreshAfterStartGame() }
-        //onAllRefreshables { refreshAfterLog("Spiel gestartet. ${first.name} beginnt.") }
     }
 
     /**
