@@ -32,6 +32,7 @@ class EndGameScene(
         }
     }
     private val resultColor = Color(185, 230, 59)
+
     init {
         background = ImageVisual("Endbild.png")
         addComponents(backToMenuButton)
@@ -44,17 +45,18 @@ class EndGameScene(
     /**
      * Displays the final ranking when the game ends.
      */
+
     override fun refreshAfterGameEnd(scores: List<FinalScore>) {
         onGameEnded()
 
-
         val sortedScores = scores.sortedByDescending { it.total }
-        var rank = 1
 
         sortedScores.forEachIndexed { index, score ->
-            if (index > 0 && score.total != sortedScores[index - 1].total) {
-                rank = index + 1
-            }
+
+            // Calculate rank (same points = same rank)
+            val rank = sortedScores.indexOfFirst {
+                it.total == score.total
+            } + 1
 
             val yPosition = 650 + index * 65
 
@@ -104,4 +106,5 @@ class EndGameScene(
         }
     }
 }
+
 
