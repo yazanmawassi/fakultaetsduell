@@ -44,7 +44,6 @@ class EndGameScene(
         font = Font(20, Color(19, 35, 43), fontWeight = Font.FontWeight.BOLD),
         visual = ColorVisual(185, 230, 59)
     ).apply {
-        componentStyle = "-fx-background-radius: 15px;"
         onMouseClicked = { openLogOverlay() }
         onMouseEntered = {
             visual = ColorVisual(228, 255, 150)
@@ -63,7 +62,6 @@ class EndGameScene(
         font = Font(20, Color(19, 35, 43), fontWeight = Font.FontWeight.BOLD),
         visual = ColorVisual(185, 230, 59)
     ).apply {
-        componentStyle = "-fx-background-radius: 15px;"
         onMouseClicked = {
             onBackToMenu()
         }
@@ -74,6 +72,24 @@ class EndGameScene(
             visual = ColorVisual(185, 230, 59)
         }
     }
+
+    private val congratsLabel = Label(
+        posX = 560,
+        posY = 322,
+        width = 800,
+        height = 70,
+        text = "Glückwunsch",
+        font = Font(size = 56, color = Color.WHITE, fontWeight = Font.FontWeight.BOLD)
+    )
+
+    private val winnerLabel = Label(
+        posX = 310,
+        posY = 392,
+        width = 1300,
+        height = 80,
+        text = "",
+        font = Font(size = 56, color = Color(185, 230, 59), fontWeight = Font.FontWeight.BOLD)
+    )
 
     private val resultColor = Color(185, 230, 59)
     private val darkBackground = ColorVisual(19, 45, 49)
@@ -110,6 +126,7 @@ class EndGameScene(
     init {
         background = ImageVisual("Endbild.png")
         addComponents(gapCover, backToMenuButton, showLogsButton)
+        addComponents(congratsLabel, winnerLabel)
 
         logPanel.add(logOverlayTitle)
         logPanel.add(logTextArea)
@@ -139,6 +156,10 @@ class EndGameScene(
         onGameEnded()
 
         val sortedScores = scores.sortedByDescending { it.total }
+
+        val topScore = sortedScores.firstOrNull()?.total
+        val winners = sortedScores.filter { it.total == topScore }
+        winnerLabel.text = winners.joinToString(" & ") { it.faculty.name } + "!"
 
         sortedScores.forEachIndexed { index, score ->
 
