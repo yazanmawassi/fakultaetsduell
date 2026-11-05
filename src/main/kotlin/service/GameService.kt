@@ -42,7 +42,6 @@ class GameService(
         rootService.currentGame = game
 
         onAllRefreshables { refreshAfterStartGame() }
-        onAllRefreshables { refreshAfterLog("Spiel gestartet. ${first.name} beginnt.") }
     }
 
     /**
@@ -68,7 +67,7 @@ class GameService(
         next.resetActionPoints()
 
         onAllRefreshables { refreshAfterTurnChange(next) }
-        onAllRefreshables { refreshAfterLog("${next.name} ist am Zug.") }
+        //onAllRefreshables { refreshAfterLog("${next.name} ist am Zug.") }
         // Verklemmung: the new faculty cannot act at all, so it is skipped.
         if (!rootService.playerActionService.hasPossibleAction()) {
             onAllRefreshables { refreshAfterLog("${next.name} kann keine Aktion ausführen und wird übersprungen.") }
