@@ -12,21 +12,26 @@ import tools.aqua.bgw.components.layoutviews.Pane
 import tools.aqua.bgw.components.uicomponents.Button
 import tools.aqua.bgw.components.uicomponents.Label
 import tools.aqua.bgw.core.Alignment
+import tools.aqua.bgw.core.BoardGameApplication
 import tools.aqua.bgw.core.BoardGameScene
 import tools.aqua.bgw.core.Color
 import tools.aqua.bgw.util.Font
 import tools.aqua.bgw.visual.ColorVisual
 import tools.aqua.bgw.visual.Visual
 import tools.aqua.bgw.components.uicomponents.TextArea
+import java.util.Timer
+import java.util.TimerTask
+import kotlin.math.abs
 
 /**
  * Main game screen: faculties and the action "Strategie anpassen" on the left,
  * opponents, central literature, own research and hand in the middle,
  * action points, log and "Zug beenden" on the right.
  *
- * Connected to the service: "Strategie anpassen" and "Zug beenden".
- * The other actions are marked with a comment `// US "..."` that shows which
- * service call belongs there.
+ * Actions are animated: cards fly to their target, points float up after publishing and the
+ * hand fans out while choosing a card for "Strategie anpassen". The small animations run on a
+ * background timer and change the components on the GUI thread. The turn overlay waits until
+ * the animation of the last action is finished and only then locks the input.
  */
 @Suppress("TooManyFunctions") // Refreshable callbacks keep the scene in sync with service events.
 class GameScene(private val rootService: RootService) :
@@ -34,6 +39,10 @@ class GameScene(private val rootService: RootService) :
 
     /** What a click on a hand card currently means. */
     private enum class Mode { NORMAL, STRATEGY_DISCARD, STRATEGY_KEEP }
+
+    /** A position on the scene (absolute coordinates). */
+    private data class Point(val x: Double, val y: Double)
+
     private val cardImages = CardImageLoader()
     private var mode = Mode.NORMAL
     private var turnsPlayed = 0
@@ -44,6 +53,15 @@ class GameScene(private val rootService: RootService) :
     private var pointsAtTurnStart = 0
     private val actionsThisTurn = mutableListOf<String>()
 
+    /** Flying cards and floating texts; removed when their animation ends or when the turn overlay appears. */
+    private val effectLabels = mutableListOf<Label>()
+
+    /** How long the animation of the current action takes; the turn overlay waits for it. */
+    private var pendingEffectMillis = 0
+
+    /** Background timer for the small GUI animations (cards flying, points floating up, fades). */
+    private val effectTimer = Timer("gui-effects", true)
+
     // ===================== Farben & Schriften =====================
 
     private val white = Color(255, 255, 255)
@@ -51,6 +69,8 @@ class GameScene(private val rootService: RootService) :
     private val grey = Color(110, 125, 130)
     private val muted = Color(160, 185, 185)
     private val lime = Color(200, 255, 60)
+    private val pointsGreen = Color(46, 125, 50)
+    private val sabotageRed = Color(211, 47, 47)
 
     private val cardVisual = ColorVisual(17, 52, 52)
     private val activeCardVisual = ColorVisual(28, 72, 56)
@@ -64,6 +84,10 @@ class GameScene(private val rootService: RootService) :
     private val endTurnVisual = ColorVisual(200, 255, 60)
     private val endTurnHoverVisual = ColorVisual(228, 255, 150)
     private val endTurnDisabledVisual = ColorVisual(70, 95, 95)
+
+    // Strategie-Modus: Glow um die Handkarten
+    private val glowOuterVisual = ColorVisual(255, 214, 0, 0.25)
+    private val glowInnerVisual = ColorVisual(255, 214, 0, 0.6)
 
     private fun font(size: Int, color: Color = white, bold: Boolean = false) =
         Font(size = size, color = color, fontWeight = if (bold) Font.FontWeight.BOLD else Font.FontWeight.NORMAL)
@@ -148,15 +172,7 @@ class GameScene(private val rootService: RootService) :
     /** Draw stack that allows the player to gain a new idea when permitted. */
     private val drawStackPane = Pane<ComponentView>(
         posX = 1225, posY = 272, width = 135, height = 165
-    ).apply {
-        onMouseClicked = {
-            if (canDrawIdea()) {
-                runAction {
-                    rootService.playerActionService.drawIdea()
-                }
-            }
-        }
-    }
+    ).apply { onMouseClicked = { onDrawStackClicked() } }
 
     private val drawStackCaption = Label(
         posX = 1215, posY = 432, width = 155, height = 18, text = "NACHZIEHSTAPEL",
@@ -190,7 +206,7 @@ class GameScene(private val rootService: RootService) :
         posX = 680, posY = 745, width = 500, height = 25, text = "", font = font(15, dark, true)
     )
 
-    private val handPane = Pane<ComponentView>(posX = 320, posY = 775, width = 1220, height = 175)
+    private val handPane = Pane<ComponentView>(posX = 320, posY = 775, width = HAND_PANE_WIDTH, height = 175)
 
     private val infoLabel = Label(
         posX = 630, posY = 975, width = 600, height = 40, text = "", font = font(14, dark), visual = lightVisual
@@ -199,6 +215,14 @@ class GameScene(private val rootService: RootService) :
     private val strategyPane = Pane<ComponentView>(
         posX = 690, posY = 300, width = 560, height = 230, visual = paperVisual
     ).apply { isVisible = false }
+
+    /** Dims the board above the hand while "Strategie anpassen" is running; a click cancels it. */
+    private val spotlightOverlay = Label(
+        posX = 320, posY = 80, width = 1220, height = 655, visual = ColorVisual(0, 0, 0, 0.5)
+    ).apply {
+        isVisible = false
+        onMouseClicked = { if (mode == Mode.STRATEGY_DISCARD) onStrategyClicked() }
+    }
 
     /** Dims the public table while the transition panel is visible. Private cards are hidden separately. */
     private val turnOverlay = Pane<ComponentView>(
@@ -287,7 +311,8 @@ class GameScene(private val rootService: RootService) :
             apBox, apTitle, apValue, logTitle, logLabel, endTurnButton
         )
         researchColumns.forEach { addComponents(it) }
-        addComponents(strategyPane)
+        // The spotlight lies above the board, the strategy window above the spotlight.
+        addComponents(spotlightOverlay, strategyPane)
         turnOverlay.add(turnOverlayTitle)
         turnOverlay.add(turnOverlaySummaryTitle)
         turnOverlay.add(turnOverlaySummaryText)
@@ -296,6 +321,7 @@ class GameScene(private val rootService: RootService) :
         turnOverlay.add(turnOverlayNextName)
         turnOverlay.add(turnOverlayCountdown)
         addComponents(turnOverlay)
+        setUpHoverEffects()
     }
 
     /** Hover effects for the elements that exist the whole time (not rebuilt in [redraw]). */
@@ -361,11 +387,15 @@ class GameScene(private val rootService: RootService) :
     override fun refreshAfterPublish(faculty: Faculty, area: CardSuit, points: Int) {
         actionsThisTurn.add("Publiziert ($area)")
         redraw()
+        val column = researchColumns[SUITS.indexOf(area)]
+        floatText("+$points", Point(column.posX + (column.width - FLOAT_WIDTH) / 2, column.posY), pointsGreen)
     }
 
     override fun refreshAfterSabotage(target: Faculty, area: CardSuit) {
         actionsThisTurn.add("Konkurrenz ausgebremst")
         redraw()
+        val center = Point(opponentsPane.posX + (opponentsPane.width - FLOAT_WIDTH) / 2, opponentsPane.posY)
+        floatText("−1 bei ${target.name}", center, sabotageRed)
     }
 
     override fun refreshAfterUseLiterature(faculty: Faculty, card: ResearchCard) {
@@ -399,8 +429,11 @@ class GameScene(private val rootService: RootService) :
                 runAction { rootService.playerActionService.finishStrategy(card) }
             })
         }
-        strategyPane.isVisible = true
         redraw()
+        // The window with the two drawn cards fades in.
+        strategyPane.opacity = 0.0
+        strategyPane.isVisible = true
+        animate(STRATEGY_FADE_MILLIS, onStep = { t -> strategyPane.opacity = t })
     }
 
     override fun refreshAfterStrategyEnd(faculty: Faculty) {
@@ -445,10 +478,28 @@ class GameScene(private val rootService: RootService) :
             turnOverlayNextName.font = font(38, lime, true)
         }
 
-        turnOverlay.isVisible = true
         endTurnButton.isDisabled = true
         endTurnButton.visual = endTurnDisabledVisual
+
+        // Let the animation of the last action finish before the overlay appears and the input is locked.
+        val delay = pendingEffectMillis
+        pendingEffectMillis = 0
+        if (delay > 0) {
+            playAnimation(DelayAnimation(delay).apply {
+                onFinished = { onGui { fadeInTurnOverlay(generation, faculty) } }
+            })
+        } else {
+            fadeInTurnOverlay(generation, faculty)
+        }
+    }
+
+    /** Locks the input, removes leftover effects, fades the turn overlay in and starts the countdown. */
+    private fun fadeInTurnOverlay(generation: Int, faculty: Faculty) {
+        if (!turnTransitionActive || generation != transitionGeneration) return
         lock()
+        effectLabels.toList().forEach { removeEffect(it) }
+        spotlightOverlay.isVisible = false
+        turnOverlay.isVisible = true
         playAnimation(FadeAnimation(turnOverlay, fromOpacity = 0.0, toOpacity = 1.0,
             duration = TURN_FADE_MILLIS).apply {
             onFinished = {
@@ -504,6 +555,7 @@ class GameScene(private val rootService: RootService) :
         handPane.isVisible = true
         handTitle.isVisible = true
         unlock()
+        effectLabels.toList().forEach { removeEffect(it) }
     }
 
     // ===================== Zeichnen =====================
@@ -518,6 +570,7 @@ class GameScene(private val rootService: RootService) :
         apValue.text = "${current.actionPoints} von 2 AP verfügbar"
         literatureCount.text = "${game.centralLiterature.size} / 6 OFFEN"
         strategyButton.visual = if (mode == Mode.NORMAL) cardVisual else activeCardVisual
+        spotlightOverlay.isVisible = mode != Mode.NORMAL && !turnTransitionActive
 
         drawFaculties(game.faculties, current)
         drawOpponents(game.faculties.filter { it !== current })
@@ -527,7 +580,7 @@ class GameScene(private val rootService: RootService) :
         drawHand(current)
         infoLabel.text = infoText(current)
         endTurnButton.isDisabled = turnTransitionActive || mode == Mode.STRATEGY_KEEP ||
-            rootService.playerActionService.hasPossibleAction()
+                rootService.playerActionService.hasPossibleAction()
         endTurnButton.visual = if (endTurnButton.isDisabled) endTurnDisabledVisual else endTurnVisual
         endTurnButton.scale = 1.0
     }
@@ -637,8 +690,6 @@ class GameScene(private val rootService: RootService) :
                     posX = 214 + (k % 2) * 56, posY = 8 + (k / 2) * 36, width = 50, height = 32,
                     text = "$suit ${stack.size}", font = font(14, suitColor(suit), true), visual = paperVisual
                 ).apply {
-                    // US "Konkurrenz ausbremsen": hier
-                    // runAction { rootService.playerActionService.sabotage(opponent, suit) } aufrufen
                     onMouseClicked = {
                         if (hasActionPoints(2) && stack.isNotEmpty()) {
                             runAction {
@@ -661,17 +712,17 @@ class GameScene(private val rootService: RootService) :
     /**
      * Renders cards in the central literature and connects the "Use Literature" action (2 AP).
      *
-     * Clicking a card removes it from the central literature and moves it
-     * to the active faculty's matching research stack.
+     * Clicking a card moves it to the active faculty's matching research stack;
+     * a copy of the card flies there.
      *
      * @param cards Currently available [ResearchCard]s in central literature.
      */
     private fun drawLiterature(cards: List<ResearchCard>) {
         literaturePane.clear()
         cards.forEachIndexed { i, card ->
-            literaturePane.add(cardLabel(card, i * 113, 5, 91, 140, { hasActionPoints(2) }) {
-                runAction { rootService.playerActionService.useLiterature(card) }
-            })
+            val label = cardLabel(card, i * 113, 5, 91, 140, { hasActionPoints(2) }) {}
+            label.onMouseClicked = { onLiteratureCardClicked(card, label) }
+            literaturePane.add(label)
         }
     }
 
@@ -739,16 +790,39 @@ class GameScene(private val rootService: RootService) :
     private fun drawHand(faculty: Faculty) {
         handPane.clear()
         val hand = faculty.handCards
-        handTitle.text = "DEINE HAND   ${hand.size} / 6"
-        val cardWidth = 105
-        val step = 118
-        val total = cardWidth + (hand.size - 1).coerceAtLeast(0) * step
-        val startX = (1220 - total) / 2
+        val discardMode = mode == Mode.STRATEGY_DISCARD
+        handTitle.text = if (discardMode) "✦ WÄHLE EINE KARTE ZUM ABWERFEN ✦" else "DEINE HAND   ${hand.size} / 6"
+        val startX = handStartX(hand.size)
+        val middle = (hand.size - 1) / 2.0
+
         hand.forEachIndexed { i, card ->
+            // In strategy mode the cards are lifted and fanned out like a real hand.
+            val offset = i - middle
+            val y = if (discardMode) HAND_CARD_Y - STRATEGY_LIFT + (abs(offset) * FAN_DROP).toInt() else HAND_CARD_Y
             val canClick = { mode == Mode.STRATEGY_DISCARD || hasActionPoints(1) }
-            handPane.add(cardLabel(card, startX + i * step, 15, cardWidth, 160, canClick) { onHandCardClicked(card) })
+            val label = cardLabel(card, startX + i * HAND_STEP, y, HAND_CARD_WIDTH, HAND_CARD_HEIGHT, canClick) {}
+            label.onMouseClicked = { onHandCardClicked(card, label) }
+            if (discardMode) {
+                label.rotation = offset * FAN_ANGLE
+                handPane.add(glowBehind(label, GLOW_OUTER, glowOuterVisual))
+                handPane.add(glowBehind(label, GLOW_INNER, glowInnerVisual))
+            }
+            handPane.add(label)
         }
     }
+
+    /** X position of the first hand card, so that [count] cards are centered in the hand. */
+    private fun handStartX(count: Int): Int {
+        val total = HAND_CARD_WIDTH + (count - 1).coerceAtLeast(0) * HAND_STEP
+        return (HAND_PANE_WIDTH - total) / 2
+    }
+
+    /** A colored frame behind [card] with the same rotation, so the card seems to glow. */
+    private fun glowBehind(card: Label, margin: Int, visual: ColorVisual) = Label(
+        posX = card.posX - margin, posY = card.posY - margin,
+        width = card.width + 2 * margin, height = card.height + 2 * margin,
+        visual = visual
+    ).apply { rotation = card.rotation }
 
     private fun infoText(current: Faculty) = when {
         mode == Mode.STRATEGY_DISCARD -> "Strategie: Wähle eine Handkarte zum Abwerfen."
@@ -762,19 +836,20 @@ class GameScene(private val rootService: RootService) :
     /**
      * Handles a hand card click depending on the current interaction mode.
      *
-     * In normal mode, uses the card for research. The service validates the
-     * action, moves the card to the matching research stack, updates the
-     * central literature, and deducts one action point.
-     *
-     * During strategy adjustment, discards the selected card. If the player
-     * must choose one of the two drawn cards, displays a reminder instead.
+     * In normal mode, uses the card for research; a copy of the card flies to its research column.
+     * During strategy adjustment, discards the selected card. If the player must choose one of the
+     * two drawn cards, displays a reminder instead.
      *
      * @param card the hand card clicked by the player
+     * @param label the label that shows this card in the hand
      */
-    private fun onHandCardClicked(card: ResearchCard) {
+    private fun onHandCardClicked(card: ResearchCard, label: Label) {
         when (mode) {
-            Mode.NORMAL -> runAction {
-                rootService.playerActionService.research(card)
+            Mode.NORMAL -> {
+                val from = absolute(handPane, label)
+                flyCard(cardImages.frontImageFor(card.suit, card.value), from, researchTarget(card.suit)) {
+                    runAction { rootService.playerActionService.research(card) }
+                }
             }
             Mode.STRATEGY_DISCARD -> runAction {
                 rootService.playerActionService.startStrategy(card)
@@ -782,6 +857,28 @@ class GameScene(private val rootService: RootService) :
             Mode.STRATEGY_KEEP -> addLog(
                 "Bitte zuerst eine der zwei gezogenen Karten wählen."
             )
+        }
+    }
+
+    /** "Literatur nutzen": the card moves to its research column and a copy flies there. */
+    private fun onLiteratureCardClicked(card: ResearchCard, label: Label) {
+        val from = absolute(literaturePane, label)
+        flyCard(cardImages.frontImageFor(card.suit, card.value), from, researchTarget(card.suit)) {
+            runAction { rootService.playerActionService.useLiterature(card) }
+        }
+    }
+
+    /** "Neue Ideen gewinnen": a card is drawn and a card back flies from the draw stack into the hand. */
+    private fun onDrawStackClicked() {
+        if (!canDrawIdea()) return
+        val handSize = activeFaculty()?.handCards?.size ?: return
+        val from = Point(drawStackPane.posX + DRAW_CARD_OFFSET, drawStackPane.posY + DRAW_CARD_OFFSET)
+        val to = Point(
+            handPane.posX + handStartX(handSize + 1) + handSize * HAND_STEP,
+            handPane.posY + HAND_CARD_Y
+        )
+        flyCard(cardImages.backImage, from, to) {
+            runAction { rootService.playerActionService.drawIdea() }
         }
     }
 
@@ -795,23 +892,106 @@ class GameScene(private val rootService: RootService) :
         redraw()
     }
 
-    /** Runs a service action and shows rule violations in the log instead of crashing. */
-    private fun runAction(allowDuringTransition: Boolean = false, action: () -> Unit) {
-        if (turnTransitionActive && !allowDuringTransition) return
-        try {
+    /**
+     * Runs a service action and shows rule violations in the log instead of crashing.
+     *
+     * @return true if the action was executed without a rule violation
+     */
+    private fun runAction(allowDuringTransition: Boolean = false, action: () -> Unit): Boolean {
+        if (turnTransitionActive && !allowDuringTransition) return false
+        return try {
             action()
+            true
         } catch (e: IllegalStateException) {
             addLog("⚠ ${e.message}")
+            false
         } catch (e: IllegalArgumentException) {
             addLog("⚠ ${e.message}")
-        } catch (e: NotImplementedError) {
-            addLog("⚠ Aktion noch nicht implementiert.")
+            false
         }
     }
 
-    /** Placeholder for actions whose user story is not connected to the service yet. */
-    private fun notConnected(action: String) {
-        addLog("ℹ $action ist noch nicht mit dem Service verbunden.")
+    // ===================== Animationen =====================
+
+    /**
+     * Calls [action] (the service) and, if it succeeded, lets a copy of the card fly from [from] to [to].
+     * The copy is removed when it has arrived.
+     */
+    private fun flyCard(visual: Visual, from: Point, to: Point, action: () -> Boolean) {
+        if (turnTransitionActive) return
+        effectLabels.toList().forEach { removeEffect(it) }
+
+        pendingEffectMillis = FLY_DURATION
+        val success = action()
+        pendingEffectMillis = 0
+        if (!success) return
+
+        val flying = Label(
+            posX = from.x, posY = from.y, width = HAND_CARD_WIDTH, height = HAND_CARD_HEIGHT, visual = visual
+        )
+        effectLabels += flying
+        addComponents(flying)
+        animate(FLY_DURATION, onStep = { t ->
+            val eased = t * t * (3 - 2 * t)
+            flying.posX = from.x + (to.x - from.x) * eased
+            flying.posY = from.y + (to.y - from.y) * eased
+        }, onDone = { removeEffect(flying) })
+    }
+
+    /** Shows [text] at [at]; it floats upwards and fades out (e.g. "+5" after publishing). */
+    private fun floatText(text: String, at: Point, color: Color) {
+        val label = Label(
+            posX = at.x, posY = at.y, width = FLOAT_WIDTH, height = FLOAT_HEIGHT, text = text,
+            font = font(FLOAT_FONT_SIZE, color, true), alignment = Alignment.CENTER
+        )
+        effectLabels += label
+        addComponents(label)
+        pendingEffectMillis = FLOAT_DURATION
+        animate(FLOAT_DURATION, onStep = { t ->
+            label.posY = at.y - FLOAT_DISTANCE * t
+            label.opacity = 1.0 - t
+        }, onDone = { removeEffect(label) })
+    }
+
+    /**
+     * Runs a small animation without BGW animations: a background timer calls [onStep] with the
+     * progress 0..1 on the GUI thread, [onDone] is called once at the end.
+     */
+    private fun animate(durationMillis: Int, onStep: (Double) -> Unit, onDone: () -> Unit = {}) {
+        val stepMillis = (durationMillis / ANIMATION_STEPS).toLong().coerceAtLeast(1)
+        var step = 0
+        effectTimer.scheduleAtFixedRate(object : TimerTask() {
+            override fun run() {
+                step++
+                val t = (step.toDouble() / ANIMATION_STEPS).coerceAtMost(1.0)
+                val done = step >= ANIMATION_STEPS
+                if (done) cancel()
+                onGui {
+                    onStep(t)
+                    if (done) onDone()
+                }
+            }
+        }, stepMillis, stepMillis)
+    }
+
+    /** UI changes from a background thread or an animation callback must run on the GUI thread. */
+    private fun onGui(task: () -> Unit) {
+        BoardGameApplication.runOnGUIThread { task() }
+    }
+
+    /** Removes an animation label from the scene (only once). */
+    private fun removeEffect(label: Label) {
+        if (effectLabels.remove(label)) removeComponents(label)
+    }
+
+    /** Absolute position of [child], which lies inside [pane]. */
+    private fun absolute(pane: Pane<ComponentView>, child: ComponentView) =
+        Point(pane.posX + child.posX, pane.posY + child.posY)
+
+    /** Where a flying card lands in the research column of [suit]. */
+    private fun researchTarget(suit: CardSuit): Point {
+        val column = researchColumns[SUITS.indexOf(suit)]
+        return Point(column.posX + (column.width - HAND_CARD_WIDTH) / 2, column.posY + RESEARCH_TARGET_Y)
     }
 
     // ===================== Hover-Effekte =====================
@@ -916,10 +1096,35 @@ class GameScene(private val rootService: RootService) :
         const val TURN_FADE_MILLIS = 300
         const val TURN_COUNTDOWN_SECONDS = 3
         const val COUNTDOWN_STEP_MILLIS = 1000
-        //const val MAX_LOG_LINES = 20
         const val MAX_HAND_BEFORE_DRAW = 5
         const val HOVER_LIFT = 14.0
         const val HOVER_SCALE = 1.06
         const val BUTTON_HOVER_SCALE = 1.03
+
+        // Hand
+        const val HAND_PANE_WIDTH = 1220
+        const val HAND_CARD_Y = 15
+        const val HAND_CARD_WIDTH = 105
+        const val HAND_CARD_HEIGHT = 160
+        const val HAND_STEP = 118
+
+        // Strategie anpassen
+        const val STRATEGY_LIFT = 12
+        const val FAN_ANGLE = 5.0
+        const val FAN_DROP = 6
+        const val GLOW_OUTER = 10
+        const val GLOW_INNER = 4
+        const val STRATEGY_FADE_MILLIS = 250
+
+        // Animationen (Dauer in Millisekunden)
+        const val ANIMATION_STEPS = 20
+        const val FLY_DURATION = 350
+        const val FLOAT_DURATION = 900
+        const val FLOAT_DISTANCE = 60
+        const val FLOAT_WIDTH = 220
+        const val FLOAT_HEIGHT = 40
+        const val FLOAT_FONT_SIZE = 26
+        const val DRAW_CARD_OFFSET = 6
+        const val RESEARCH_TARGET_Y = 30
     }
 }
