@@ -6,6 +6,7 @@ import service.Refreshable
 import service.RootService
 import service.FinalScore
 import tools.aqua.bgw.animation.DelayAnimation
+import tools.aqua.bgw.animation.FadeAnimation
 import tools.aqua.bgw.components.ComponentView
 import tools.aqua.bgw.components.layoutviews.Pane
 import tools.aqua.bgw.components.uicomponents.Button
@@ -37,6 +38,7 @@ class GameScene(private val rootService: RootService) :
     private var mode = Mode.NORMAL
     private var turnsPlayed = 0
     private var turnTransitionActive = false
+    private var switchingTurnAfterCountdown = false
     private var transitionGeneration = 0
     private val logMessages = mutableListOf<String>()
     private var pointsAtTurnStart = 0
@@ -198,10 +200,14 @@ class GameScene(private val rootService: RootService) :
         posX = 690, posY = 300, width = 560, height = 230, visual = paperVisual
     ).apply { isVisible = false }
 
-    /** Covers the table and hides private cards during a turn transition. */
+    /** Dims the public table while the transition panel is visible. Private cards are hidden separately. */
     private val turnOverlay = Pane<ComponentView>(
-        posX = 0, posY = 0, width = 1920, height = 1080, visual = ColorVisual(13, 43, 43)
+        posX = 0, posY = 0, width = 1920, height = 1080, visual = ColorVisual(5, 18, 22, 0.65)
     ).apply { isVisible = false }
+
+    private val turnOverlayPanel = Pane<ComponentView>(
+        posX = 560, posY = 300, width = 800, height = 480, visual = ColorVisual(19, 45, 49)
+    )
 
     private val turnOverlayTitle = Label(
         posX = 460, posY = 200, width = 1000, height = 70,
@@ -368,7 +374,7 @@ class GameScene(private val rootService: RootService) :
     }
 
     override fun refreshAfterTurnChange(nextFaculty: Faculty) {
-        cancelTurnTransition()
+        if (!switchingTurnAfterCountdown) cancelTurnTransition()
         turnsPlayed++
         mode = Mode.NORMAL
         strategyPane.isVisible = false
@@ -443,7 +449,14 @@ class GameScene(private val rootService: RootService) :
         endTurnButton.isDisabled = true
         endTurnButton.visual = endTurnDisabledVisual
         lock()
-        countDownTurn(TURN_COUNTDOWN_SECONDS, generation, faculty)
+        playAnimation(FadeAnimation(turnOverlay, fromOpacity = 0.0, toOpacity = 1.0,
+            duration = TURN_FADE_MILLIS).apply {
+            onFinished = {
+                if (turnTransitionActive && generation == transitionGeneration && activeFaculty() === faculty) {
+                    countDownTurn(TURN_COUNTDOWN_SECONDS, generation, faculty)
+                }
+            }
+        })
     }
 
     /** Schedules one non-blocking countdown step and ignores callbacks from an obsolete transition. */
@@ -455,9 +468,28 @@ class GameScene(private val rootService: RootService) :
                     if (seconds > 1) {
                         countDownTurn(seconds - 1, generation, faculty)
                     } else {
-                        cancelTurnTransition()
-                        runAction { rootService.gameService.endTurn() }
+                        finishTurnCountdown(generation)
                     }
+                }
+            }
+        })
+    }
+
+    /** Changes the public table under the overlay, then reveals the next hand after fading out. */
+    private fun finishTurnCountdown(generation: Int) {
+        switchingTurnAfterCountdown = true
+        try {
+            runAction(allowDuringTransition = true) { rootService.gameService.endTurn() }
+        } finally {
+            switchingTurnAfterCountdown = false
+        }
+        if (!turnTransitionActive || generation != transitionGeneration) return
+        playAnimation(FadeAnimation(turnOverlay, fromOpacity = 1.0, toOpacity = 0.0,
+            duration = TURN_FADE_MILLIS).apply {
+            onFinished = {
+                if (turnTransitionActive && generation == transitionGeneration) {
+                    cancelTurnTransition()
+                    redraw()
                 }
             }
         })
@@ -468,6 +500,9 @@ class GameScene(private val rootService: RootService) :
         transitionGeneration++
         turnTransitionActive = false
         turnOverlay.isVisible = false
+        turnOverlay.opacity = 0.0
+        handPane.isVisible = true
+        handTitle.isVisible = true
         unlock()
     }
 
@@ -761,8 +796,8 @@ class GameScene(private val rootService: RootService) :
     }
 
     /** Runs a service action and shows rule violations in the log instead of crashing. */
-    private fun runAction(action: () -> Unit) {
-        if (turnTransitionActive) return
+    private fun runAction(allowDuringTransition: Boolean = false, action: () -> Unit) {
+        if (turnTransitionActive && !allowDuringTransition) return
         try {
             action()
         } catch (e: IllegalStateException) {
@@ -878,6 +913,7 @@ class GameScene(private val rootService: RootService) :
         val LONG_NAMES = listOf(
             "Künstliche Intelligenz", "IT-Sicherheit", "Software-Engineering", "Theoretische Informatik"
         )
+        const val TURN_FADE_MILLIS = 300
         const val TURN_COUNTDOWN_SECONDS = 3
         const val COUNTDOWN_STEP_MILLIS = 1000
         //const val MAX_LOG_LINES = 20
