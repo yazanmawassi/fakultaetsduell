@@ -49,8 +49,12 @@ class EndGameScene(
 
 
         val sortedScores = scores.sortedByDescending { it.total }
+        var rank = 1
 
         sortedScores.forEachIndexed { index, score ->
+            if (index > 0 && score.total != sortedScores[index - 1].total) {
+                rank = index + 1
+            }
 
             val yPosition = 650 + index * 65
 
@@ -60,7 +64,7 @@ class EndGameScene(
                 posY = yPosition,
                 width = 100,
                 height = 45,
-                text = "${index + 1}.",
+                text = "$rank.",
                 font = Font(
                     size = 28,
                     color = Color(185, 230, 59),
