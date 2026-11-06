@@ -2,17 +2,16 @@ package gui
 
 import service.FinalScore
 import service.Refreshable
-import tools.aqua.bgw.core.BoardGameScene
-import tools.aqua.bgw.visual.ImageVisual
-import tools.aqua.bgw.components.uicomponents.Label
-import tools.aqua.bgw.util.Font
-import tools.aqua.bgw.core.Color
-import tools.aqua.bgw.components.uicomponents.Button
-import tools.aqua.bgw.components.uicomponents.TextArea
-import tools.aqua.bgw.components.layoutviews.Pane
-import tools.aqua.bgw.visual.ColorVisual
-import tools.aqua.bgw.core.Alignment
 import tools.aqua.bgw.components.ComponentView
+import tools.aqua.bgw.components.layoutviews.Pane
+import tools.aqua.bgw.components.uicomponents.Button
+import tools.aqua.bgw.components.uicomponents.Label
+import tools.aqua.bgw.components.uicomponents.TextArea
+import tools.aqua.bgw.core.BoardGameScene
+import tools.aqua.bgw.core.Color
+import tools.aqua.bgw.util.Font
+import tools.aqua.bgw.visual.ColorVisual
+import tools.aqua.bgw.visual.ImageVisual
 
 /**
  * Displays the end screen and final results.
@@ -25,6 +24,13 @@ class EndGameScene(
     width = 1920,
     height = 1080
 ), Refreshable {
+
+    private val resultColor = Color(185, 230, 59)
+    private val darkBackground = ColorVisual(19, 45, 49)
+    private val overlayBackground = ColorVisual(5, 18, 22, 0.85)
+
+    /** Labels der Ergebnistabelle, damit sie beim nächsten Spiel entfernt werden können. */
+    private val resultLabels = mutableListOf<Label>()
 
     private val gapCover = Label(
         posX = 810,
@@ -45,12 +51,8 @@ class EndGameScene(
         visual = ColorVisual(185, 230, 59)
     ).apply {
         onMouseClicked = { openLogOverlay() }
-        onMouseEntered = {
-            visual = ColorVisual(228, 255, 150)
-        }
-        onMouseExited = {
-            visual = ColorVisual(185, 230, 59)
-        }
+        onMouseEntered = { visual = ColorVisual(228, 255, 150) }
+        onMouseExited = { visual = ColorVisual(185, 230, 59) }
     }
 
     private val backToMenuButton = Button(
@@ -62,15 +64,9 @@ class EndGameScene(
         font = Font(20, Color(19, 35, 43), fontWeight = Font.FontWeight.BOLD),
         visual = ColorVisual(185, 230, 59)
     ).apply {
-        onMouseClicked = {
-            onBackToMenu()
-        }
-        onMouseEntered = {
-            visual = ColorVisual(228, 255, 150)
-        }
-        onMouseExited = {
-            visual = ColorVisual(185, 230, 59)
-        }
+        onMouseClicked = { onBackToMenu() }
+        onMouseEntered = { visual = ColorVisual(228, 255, 150) }
+        onMouseExited = { visual = ColorVisual(185, 230, 59) }
     }
 
     private val congratsLabel = Label(
@@ -88,12 +84,8 @@ class EndGameScene(
         width = 1300,
         height = 80,
         text = "",
-        font = Font(size = 56, color = Color(185, 230, 59), fontWeight = Font.FontWeight.BOLD)
+        font = Font(size = 56, color = resultColor, fontWeight = Font.FontWeight.BOLD)
     )
-
-    private val resultColor = Color(185, 230, 59)
-    private val darkBackground = ColorVisual(19, 45, 49)
-    private val overlayBackground = ColorVisual(5, 18, 22, 0.85)
 
     private val logOverlay = Pane<ComponentView>(
         posX = 0, posY = 0, width = 1920, height = 1080, visual = overlayBackground
@@ -137,23 +129,18 @@ class EndGameScene(
 
     private fun openLogOverlay() {
         val logs = onLogRequested()
-        if (logs.isEmpty()) {
-            logTextArea.text = "Keine Logs verfügbar."
-        } else {
-            logTextArea.text = logs.joinToString("\n")
-        }
+        logTextArea.text = if (logs.isEmpty()) "Keine Logs verfügbar." else logs.joinToString("\n")
         logOverlay.isVisible = true
     }
 
     /**
-     * Receives the final scores after the game ends.
-     */
-
-    /**
      * Displays the final ranking when the game ends.
+     * Old result labels from a previous game are removed first.
      */
     override fun refreshAfterGameEnd(scores: List<FinalScore>) {
         onGameEnded()
+        clearResultLabels()
+        logOverlay.isVisible = false
 
         val sortedScores = scores.sortedByDescending { it.total }
 
@@ -162,53 +149,29 @@ class EndGameScene(
         winnerLabel.text = winners.joinToString(" & ") { it.faculty.name } + "!"
 
         sortedScores.forEachIndexed { index, score ->
-            val rank = sortedScores.indexOfFirst {
-                it.total == score.total
-            } + 1
-
+            val rank = sortedScores.indexOfFirst { it.total == score.total } + 1
             val yPosition = 650 + index * 65
 
-            val rankLabel = Label(
-                posX = 510,
-                posY = yPosition,
-                width = 100,
-                height = 45,
-                text = "$rank.",                font = Font(
-                    size = 28,
-                    color = Color(185, 230, 59),
-                    fontWeight = Font.FontWeight.BOLD
-                )
-            )
-
-            val facultyLabel = Label(
-                posX = 660,
-                posY = yPosition,
-                width = 480,
-                height = 45,
-                text = score.faculty.name,
-                font = Font(
-                    size = 28,
-                    color = Color(185, 230, 59),
-                    fontWeight = Font.FontWeight.BOLD
-                )
-            )
-
-            val pointsLabel = Label(
-                posX = 1190,
-                posY = yPosition,
-                width = 160,
-                height = 45,
-                text = score.total.toString(),
-                font = Font(
-                    size = 28,
-                    color = Color(185, 230, 59),
-                    fontWeight = Font.FontWeight.BOLD
-                )
-            )
-
-            addComponents(rankLabel, facultyLabel, pointsLabel)
+            resultLabels += resultLabel(posX = 510, posY = yPosition, width = 100, text = "$rank.")
+            resultLabels += resultLabel(posX = 660, posY = yPosition, width = 480, text = score.faculty.name)
+            resultLabels += resultLabel(posX = 1190, posY = yPosition, width = 160, text = score.total.toString())
         }
 
+        addComponents(*resultLabels.toTypedArray())
         logOverlay.toFront()
     }
+
+    private fun clearResultLabels() {
+        removeComponents(*resultLabels.toTypedArray())
+        resultLabels.clear()
+    }
+
+    private fun resultLabel(posX: Int, posY: Int, width: Int, text: String) = Label(
+        posX = posX,
+        posY = posY,
+        width = width,
+        height = 45,
+        text = text,
+        font = Font(size = 28, color = resultColor, fontWeight = Font.FontWeight.BOLD)
+    )
 }
