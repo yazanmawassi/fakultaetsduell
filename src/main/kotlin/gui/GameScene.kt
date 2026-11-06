@@ -81,6 +81,7 @@ class GameScene(private val rootService: RootService) :
     // Hover-Farben
     private val sabotageHoverVisual = ColorVisual(255, 214, 214)
     private val strategyHoverVisual = ColorVisual(40, 95, 70)
+    private val strategyDisabledVisual = ColorVisual(12, 32, 34)
     private val endTurnVisual = ColorVisual(200, 255, 60)
     private val endTurnHoverVisual = ColorVisual(228, 255, 150)
     private val endTurnDisabledVisual = ColorVisual(70, 95, 95)
@@ -335,9 +336,7 @@ class GameScene(private val rootService: RootService) :
         strategyName.onMouseEntered = {
             if (canStartStrategy()) strategyButton.visual = strategyHoverVisual
         }
-        strategyName.onMouseExited = {
-            strategyButton.visual = if (mode == Mode.NORMAL) cardVisual else activeCardVisual
-        }
+        strategyName.onMouseExited = { updateStrategyButton() }
 
         endTurnButton.onMouseEntered = {
             if (!endTurnButton.isDisabled) {
@@ -569,7 +568,7 @@ class GameScene(private val rootService: RootService) :
         drawStackTopLabel.text = "NACHZIEHSTAPEL  ${game.drawStack.size}"
         apValue.text = "${current.actionPoints} von 2 AP verfügbar"
         literatureCount.text = "${game.centralLiterature.size} / 6 OFFEN"
-        strategyButton.visual = if (mode == Mode.NORMAL) cardVisual else activeCardVisual
+        updateStrategyButton()
         spotlightOverlay.isVisible = mode != Mode.NORMAL && !turnTransitionActive
 
         drawFaculties(game.faculties, current)
@@ -884,12 +883,26 @@ class GameScene(private val rootService: RootService) :
 
     private fun onStrategyClicked() {
         if (turnTransitionActive) return
+        // No hand card, fewer than 2 cards in the draw stack or no AP: the action cannot start.
+        if (mode == Mode.NORMAL && !canStartStrategy()) return
         mode = when (mode) {
             Mode.NORMAL -> Mode.STRATEGY_DISCARD
             Mode.STRATEGY_DISCARD -> Mode.NORMAL
             Mode.STRATEGY_KEEP -> Mode.STRATEGY_KEEP
         }
         redraw()
+    }
+
+    /** "Strategie anpassen" stays visible, but looks greyed out and cannot be clicked if it is not possible. */
+    private fun updateStrategyButton() {
+        val possible = mode != Mode.NORMAL || canStartStrategy()
+        strategyButton.isDisabled = !possible
+        strategyButton.visual = when {
+            mode != Mode.NORMAL -> activeCardVisual
+            possible -> cardVisual
+            else -> strategyDisabledVisual
+        }
+        strategyName.font = font(17, if (possible) white else grey, true)
     }
 
     /**
