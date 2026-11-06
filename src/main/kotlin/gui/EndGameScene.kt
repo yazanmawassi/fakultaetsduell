@@ -162,6 +162,9 @@ class EndGameScene(
         winnerLabel.text = winners.joinToString(" & ") { it.faculty.name } + "!"
 
         sortedScores.forEachIndexed { index, score ->
+            val rank = sortedScores.indexOfFirst {
+                it.total == score.total
+            } + 1
 
             val yPosition = 650 + index * 65
 
@@ -170,8 +173,7 @@ class EndGameScene(
                 posY = yPosition,
                 width = 100,
                 height = 45,
-                text = "${index + 1}.",
-                font = Font(
+                text = "$rank.",                font = Font(
                     size = 28,
                     color = Color(185, 230, 59),
                     fontWeight = Font.FontWeight.BOLD
