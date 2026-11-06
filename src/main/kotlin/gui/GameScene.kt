@@ -1127,4 +1127,8 @@ class GameScene(private val rootService: RootService) :
         const val DRAW_CARD_OFFSET = 6
         const val RESEARCH_TARGET_Y = 30
     }
+
+    fun getLogs(): List<String> {
+        return logMessages.toList()
+    }
 }
