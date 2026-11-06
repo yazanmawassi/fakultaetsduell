@@ -259,6 +259,9 @@ class PlayerActionService(private val rootService: RootService) : AbstractRefres
         }
 
         // 1. Remember the number of cards on the stack
+        // old Points , bevor Point und Bonus add
+        val pointsBefore = activeFaculty.researchPoints
+
         val cardCount = researchStack.size
 
         // 2. Calculate points based on the card count [2=3 Pkt, 3=5 Pkt, 4=7 Pkt, 5+=9 Pkt]
@@ -269,17 +272,26 @@ class PlayerActionService(private val rootService: RootService) : AbstractRefres
             cardCount >= 5 -> 9
             else -> 0
         }
-        activeFaculty.researchPoints += earnedPoints
 
-        // 3. Check for First-to-Publish bonus (+1 point if no one else has published in this suit yet)
+        // Erstveröffentlichungsbonus prüfen
         val alreadyPublished = game.faculties.any { faculty ->
             faculty.publications.any { card -> card.suit == area }
         }
 
-        // If it is the first publication in this area, award +1 bonus point
-        if (!alreadyPublished) {
-            activeFaculty.researchPoints += 1
-        }
+        val bonusPoints = if (!alreadyPublished) 1 else 0
+
+        // Punktestand erhöhen, einschließlich Bonus
+        activeFaculty.researchPoints += earnedPoints
+        activeFaculty.researchPoints += bonusPoints
+
+        // Tatsächlichen Punktzuwachs für GUI und Log bestimmen
+        val pointsGained = activeFaculty.researchPoints - pointsBefore
+
+
+        // Karten veröffentlichen und Aktionspunkte abziehen
+        activeFaculty.publications.addAll(researchStack)
+        researchStack.clear()
+        activeFaculty.actionPoints -= 2
 
         // 4. Move ALL cards from this research stack into the publications list
         activeFaculty.publications.addAll(researchStack)
@@ -294,12 +306,20 @@ class PlayerActionService(private val rootService: RootService) : AbstractRefres
         // 7. Phase 3: Notify the user interface with the calculated total points
         onAllRefreshables {
             refreshAfterPublish(activeFaculty, area, earnedPoints)
-            refreshAfterLog("▶ ${activeFaculty.name} publiziert im Bereich $area und erhält $earnedPoints Punkte.")
+
+            val bonusText =
+                if (bonusPoints > 0) " (inklusive 1 Erstveröffentlichungsbonus)" else ""
+
+            refreshAfterLog(
+                "▶ ${activeFaculty.name} publiziert im Bereich $area " +
+                        "und erhält $pointsGained Punkte$bonusText."
+            )
+
         }
 
         notifyIfActionPointsDepleted()
     }
-    /** Removes the top card of [target]'s stack in [area] ("Konkurrenz ausbremsen"). */
+    /** Removes the top card of stack in  ("Konkurrenz ausbremsen"). */
 
     /**
      * Konkurrenz ausbremsen (2 AP).
