@@ -434,4 +434,8 @@ class StartScene(
 
         application.showMainGameScene(orderedNames)
     }
+
+    fun clearFields() {
+        nameFields.forEach { it.text = "" }
+    }
 }
