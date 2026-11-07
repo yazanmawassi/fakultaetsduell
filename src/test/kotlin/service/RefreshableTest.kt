@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test
  */
 class RefreshableTest {
 
+    /** Checks that all default methods of [Refreshable] can be called without throwing an exception. */
     @Test
     fun testDefaultMethods() {
         // Verwendet die leeren Methoden aus dem Interface.
