@@ -93,9 +93,6 @@ class GameScene(private val rootService: RootService) :
     private val glowOuterVisual = ColorVisual(255, 214, 0, 0.25)
     private val glowInnerVisual = ColorVisual(255, 214, 0, 0.6)
 
-   //private fun font(size: Int, color: Color = white, bold: Boolean = false) =
-     //   Font(size = size, color = color, fontWeight = if (bold) Font.FontWeight.BOLD else Font.FontWeight.NORMAL)
-
     // ===================== Kopf =====================
 
     private val logo = Label(
@@ -1184,6 +1181,7 @@ class GameScene(private val rootService: RootService) :
         logLabel.text = logMessages.joinToString("\n")
     }
 
+    /** Returns a copy of all log messages of the current game, e.g. for the end screen. */
     fun getLogs(): List<String> {
         return logMessages.toList()
     }
@@ -1232,8 +1230,4 @@ class GameScene(private val rootService: RootService) :
         const val RESEARCH_TARGET_Y = 30
         const val GHOST_OPACITY = 0.5
     }
-
-    //fun getLogs(): List<String> {
-    //    return logMessages.toList()
-    //}
 }
