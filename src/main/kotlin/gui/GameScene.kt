@@ -1139,6 +1139,7 @@ class GameScene(private val rootService: RootService) :
     // ===================== Hilfsmethoden =====================
 
     /** Creates a card image; it lifts on hover if [canHover] is true. */
+    @Suppress("LongParameterList")
     private fun cardLabel(
         card: ResearchCard, x: Int, y: Int, width: Int, height: Int,
         canHover: () -> Boolean, onClick: () -> Unit
