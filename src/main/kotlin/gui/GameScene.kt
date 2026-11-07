@@ -90,8 +90,8 @@ class GameScene(private val rootService: RootService) :
     private val glowOuterVisual = ColorVisual(255, 214, 0, 0.25)
     private val glowInnerVisual = ColorVisual(255, 214, 0, 0.6)
 
-    private fun font(size: Int, color: Color = white, bold: Boolean = false) =
-        Font(size = size, color = color, fontWeight = if (bold) Font.FontWeight.BOLD else Font.FontWeight.NORMAL)
+   //private fun font(size: Int, color: Color = white, bold: Boolean = false) =
+     //   Font(size = size, color = color, fontWeight = if (bold) Font.FontWeight.BOLD else Font.FontWeight.NORMAL)
 
     // ===================== Kopf =====================
 
@@ -350,6 +350,10 @@ class GameScene(private val rootService: RootService) :
             endTurnButton.scale = 1.0
         }
     }
+
+
+    private fun font(size: Int, color: Color = white, bold: Boolean = false) =
+        Font(size = size, color = color, fontWeight = if (bold) Font.FontWeight.BOLD else Font.FontWeight.NORMAL)
 
     // ===================== Refreshable =====================
 
@@ -1100,6 +1104,10 @@ class GameScene(private val rootService: RootService) :
         logLabel.text = logMessages.joinToString("\n")
     }
 
+    fun getLogs(): List<String> {
+        return logMessages.toList()
+    }
+
     private companion object {
         val SUITS = listOf(CardSuit.SPADES, CardSuit.HEARTS, CardSuit.DIAMONDS, CardSuit.CLUBS)
         val SHORT_NAMES = listOf("KI", "SEC", "SWE", "THEO")
@@ -1141,7 +1149,7 @@ class GameScene(private val rootService: RootService) :
         const val RESEARCH_TARGET_Y = 30
     }
 
-    fun getLogs(): List<String> {
-        return logMessages.toList()
-    }
+    //fun getLogs(): List<String> {
+    //    return logMessages.toList()
+    //}
 }
