@@ -227,46 +227,45 @@ class GameScene(private val rootService: RootService) :
 
     /** Dims the public table while the transition panel is visible. Private cards are hidden separately. */
     private val turnOverlay = Pane<ComponentView>(
-        posX = 0, posY = 0, width = 1920, height = 1080, visual = ColorVisual(5, 18, 22, 0.65)
+        posX = 0, posY = 0, width = 1920, height = 1080, visual = ColorVisual(5, 18, 22, 0.76)
     ).apply { isVisible = false }
 
     private val turnOverlayPanel = Pane<ComponentView>(
-        posX = 560, posY = 300, width = 800, height = 480, visual = ColorVisual(19, 45, 49)
+        posX = 440, posY = TURN_PANEL_Y, width = 1050, height = 656
     )
 
     private val turnOverlayTitle = Label(
-        posX = 460, posY = 200, width = 1000, height = 70,
-        text = "Dein Zug ist beendet!", font = font(42, white, true)
-    )
-
-    private val turnOverlaySummaryTitle = Label(
-        posX = 360, posY = 300, width = 1200, height = 40,
-        text = "Aktionen in diesem Zug:", font = font(28, white)
+        posX = 72, posY = 72, width = 896, height = 68,
+        text = "Dein Zug ist beendet!", font = font(44, white, true)
     )
 
     private val turnOverlaySummaryText = Label(
-        posX = 360, posY = 350, width = 1200, height = 80,
-        text = "", font = font(24, white), isWrapText = true
+        posX = 104, posY = 210, width = 832, height = 88,
+        text = "", font = font(23, white), isWrapText = true
     )
 
     private val turnOverlayPoints = Label(
-        posX = 460, posY = 460, width = 1000, height = 50,
+        posX = 72, posY = 334, width = 896, height = 56,
         text = "", font = font(32, lime, true)
     )
 
     private val turnOverlayNextTitle = Label(
-        posX = 360, posY = 580, width = 1200, height = 40,
-        text = "", font = font(28, white)
+        posX = 72, posY = 418, width = 896, height = 32,
+        text = "", font = font(22, muted, true)
     )
 
     private val turnOverlayNextName = Label(
-        posX = 360, posY = 630, width = 1200, height = 50,
-        text = "", font = font(38, lime, true)
+        posX = 72, posY = 453, width = 896, height = 54,
+        text = "", font = font(38, white, true), isWrapText = true
     )
 
     private val turnOverlayCountdown = Label(
-        posX = 760, posY = 740, width = 400, height = 120,
-        text = "", font = font(72, lime, true)
+        posX = 470, posY = 520, width = 100, height = 76,
+        text = "", font = font(48, lime, true)
+    )
+
+    private val turnOverlayProgress = Label(
+        posX = 380, posY = 612, width = TURN_PROGRESS_WIDTH, height = 5, visual = endTurnVisual
     )
 
     // ===================== Rechts =====================
@@ -314,15 +313,33 @@ class GameScene(private val rootService: RootService) :
         researchColumns.forEach { addComponents(it) }
         // The spotlight lies above the board, the strategy window above the spotlight.
         addComponents(spotlightOverlay, strategyPane)
-        turnOverlay.add(turnOverlayTitle)
-        turnOverlay.add(turnOverlaySummaryTitle)
-        turnOverlay.add(turnOverlaySummaryText)
-        turnOverlay.add(turnOverlayPoints)
-        turnOverlay.add(turnOverlayNextTitle)
-        turnOverlay.add(turnOverlayNextName)
-        turnOverlay.add(turnOverlayCountdown)
+        buildTurnOverlayPanel()
+        turnOverlay.add(turnOverlayPanel)
         addComponents(turnOverlay)
         setUpHoverEffects()
+    }
+
+    private fun buildTurnOverlayPanel() {
+        listOf(
+            Label(posX = 8, posY = 12, width = 1040, height = 644, visual = ColorVisual(0, 0, 0, 0.35)),
+            Label(posX = 0, posY = 0, width = 1040, height = 644, visual = ColorVisual(24, 70, 49)),
+            Label(posX = 0, posY = 0, width = 1040, height = 5, visual = endTurnVisual),
+            Label(posX = 72, posY = 40, width = 896, height = 26,
+                text = "ZUGÜBERSICHT", font = font(16, lime, true)),
+            turnOverlayTitle,
+            Label(posX = 72, posY = 160, width = 896, height = 148, visual = ColorVisual(15, 51, 36)),
+            Label(posX = 104, posY = 174, width = 832, height = 30,
+                text = "Aktionen in diesem Zug", font = font(19, muted, true)),
+            turnOverlaySummaryText,
+            turnOverlayPoints,
+            Label(posX = 72, posY = 404, width = 896, height = 1, visual = ColorVisual(64, 107, 81)),
+            turnOverlayNextTitle,
+            turnOverlayNextName,
+            turnOverlayCountdown,
+            Label(posX = 380, posY = 612, width = TURN_PROGRESS_WIDTH, height = 5,
+                visual = ColorVisual(64, 107, 81)),
+            turnOverlayProgress
+        ).forEach { turnOverlayPanel.add(it) }
     }
 
     /** Hover effects for the elements that exist the whole time (not rebuilt in [redraw]). */
@@ -474,7 +491,7 @@ class GameScene(private val rootService: RootService) :
         } else {
             turnOverlayNextTitle.text = "Nächster Spieler:"
             turnOverlayNextName.text = next.name
-            turnOverlayNextName.font = font(38, lime, true)
+            turnOverlayNextName.font = font(38, white, true)
         }
 
         endTurnButton.isDisabled = true
@@ -498,13 +515,22 @@ class GameScene(private val rootService: RootService) :
         lock()
         effectLabels.toList().forEach { removeEffect(it) }
         spotlightOverlay.isVisible = false
+        turnOverlay.opacity = 0.0
+        turnOverlayPanel.posY = TURN_PANEL_Y + TURN_PANEL_LIFT
+        turnOverlayCountdown.text = TURN_COUNTDOWN_SECONDS.toString()
+        turnOverlayCountdown.scale = 1.0
+        turnOverlayProgress.width = TURN_PROGRESS_WIDTH.toDouble()
+        turnOverlayProgress.isVisible = true
         turnOverlay.isVisible = true
-        playAnimation(FadeAnimation(turnOverlay, fromOpacity = 0.0, toOpacity = 1.0,
-            duration = TURN_FADE_MILLIS).apply {
-            onFinished = {
-                if (turnTransitionActive && generation == transitionGeneration && activeFaculty() === faculty) {
-                    countDownTurn(TURN_COUNTDOWN_SECONDS, generation, faculty)
-                }
+        animate(TURN_FADE_MILLIS, onStep = { t ->
+            if (turnTransitionActive && generation == transitionGeneration) {
+                val eased = t * (2 - t)
+                turnOverlay.opacity = eased
+                turnOverlayPanel.posY = TURN_PANEL_Y + TURN_PANEL_LIFT * (1 - eased)
+            }
+        }, onDone = {
+            if (turnTransitionActive && generation == transitionGeneration && activeFaculty() === faculty) {
+                countDownTurn(TURN_COUNTDOWN_SECONDS, generation, faculty)
             }
         })
     }
@@ -512,6 +538,18 @@ class GameScene(private val rootService: RootService) :
     /** Schedules one non-blocking countdown step and ignores callbacks from an obsolete transition. */
     private fun countDownTurn(seconds: Int, generation: Int, faculty: Faculty) {
         turnOverlayCountdown.text = seconds.toString()
+        turnOverlayCountdown.scale = 1.18
+        animate(COUNTDOWN_STEP_MILLIS, onStep = { t ->
+            if (turnTransitionActive && generation == transitionGeneration && activeFaculty() === faculty &&
+                turnOverlayCountdown.text == seconds.toString()
+            ) {
+                val pulse = (1.0 - t / 0.25).coerceAtLeast(0.0)
+                turnOverlayCountdown.scale = 1.0 + 0.18 * pulse * pulse
+                val remaining = (seconds - t) / TURN_COUNTDOWN_SECONDS
+                turnOverlayProgress.width = (TURN_PROGRESS_WIDTH * remaining).coerceAtLeast(1.0)
+                turnOverlayProgress.isVisible = remaining > 0.0
+            }
+        })
         playAnimation(DelayAnimation(COUNTDOWN_STEP_MILLIS).apply {
             onFinished = {
                 if (turnTransitionActive && generation == transitionGeneration && activeFaculty() === faculty) {
@@ -1106,6 +1144,9 @@ class GameScene(private val rootService: RootService) :
         val LONG_NAMES = listOf(
             "Künstliche Intelligenz", "IT-Sicherheit", "Software-Engineering", "Theoretische Informatik"
         )
+        const val TURN_PANEL_Y = 218
+        const val TURN_PANEL_LIFT = 24.0
+        const val TURN_PROGRESS_WIDTH = 280
         const val TURN_FADE_MILLIS = 300
         const val TURN_COUNTDOWN_SECONDS = 3
         const val COUNTDOWN_STEP_MILLIS = 1000
