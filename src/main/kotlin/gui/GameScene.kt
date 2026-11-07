@@ -62,6 +62,9 @@ class GameScene(private val rootService: RootService) :
     /** Background timer for the small GUI animations (cards flying, points floating up, fades). */
     private val effectTimer = Timer("gui-effects", true)
 
+    /** Transparent preview card in the hand while the mouse is over the draw stack. */
+    private var ghostCard: Label? = null
+
     // ===================== Farben & Schriften =====================
 
     private val white = Color(255, 255, 255)
@@ -344,7 +347,7 @@ class GameScene(private val rootService: RootService) :
 
     /** Hover effects for the elements that exist the whole time (not rebuilt in [redraw]). */
     private fun setUpHoverEffects() {
-        liftOnHover(drawStackPane) { canDrawIdea() }
+        setUpDrawStackHover()
 
         researchColumns.forEachIndexed { i, column ->
             highlightOnHover(column, suitLightVisual(SUITS[i]), { lightVisual }) { canPublish(SUITS[i]) }
@@ -826,6 +829,7 @@ class GameScene(private val rootService: RootService) :
 
     private fun drawHand(faculty: Faculty) {
         handPane.clear()
+        ghostCard = null
         val hand = faculty.handCards
         val discardMode = mode == Mode.STRATEGY_DISCARD
         handTitle.text = if (discardMode) "✦ WÄHLE EINE KARTE ZUM ABWERFEN ✦" else "DEINE HAND   ${hand.size} / 6"
@@ -1062,6 +1066,44 @@ class GameScene(private val rootService: RootService) :
         }
     }
 
+    /**
+     * Hover over the draw stack: the stack lifts and a transparent card back shows
+     * the place in the hand where the drawn card will land.
+     */
+    private fun setUpDrawStackHover() {
+        val baseY = drawStackPane.posY
+        drawStackPane.onMouseEntered = {
+            if (canDrawIdea()) {
+                drawStackPane.posY = baseY - HOVER_LIFT
+                drawStackPane.scale = HOVER_SCALE
+                showGhostCard()
+            }
+        }
+        drawStackPane.onMouseExited = {
+            drawStackPane.posY = baseY
+            drawStackPane.scale = 1.0
+            hideGhostCard()
+        }
+    }
+
+    /** Shows a transparent card back right of the last hand card. */
+    private fun showGhostCard() {
+        hideGhostCard()
+        val handSize = activeFaculty()?.handCards?.size ?: return
+        val ghost = Label(
+            posX = handStartX(handSize) + handSize * HAND_STEP, posY = HAND_CARD_Y,
+            width = HAND_CARD_WIDTH, height = HAND_CARD_HEIGHT, visual = cardImages.backImage
+        ).apply { opacity = GHOST_OPACITY }
+        ghostCard = ghost
+        handPane.add(ghost)
+    }
+
+    /** Removes the preview card from the hand, if it is still shown. */
+    private fun hideGhostCard() {
+        ghostCard?.let { if (handPane.components.contains(it)) handPane.remove(it) }
+        ghostCard = null
+    }
+
     /** Changes the visual of [component] while the mouse is over it, but only if [canHover] is true. */
     private fun highlightOnHover(
         component: ComponentView, hoverVisual: Visual, normalVisual: () -> Visual, canHover: () -> Boolean
@@ -1180,6 +1222,7 @@ class GameScene(private val rootService: RootService) :
         const val FLOAT_FONT_SIZE = 26
         const val DRAW_CARD_OFFSET = 6
         const val RESEARCH_TARGET_Y = 30
+        const val GHOST_OPACITY = 0.5
     }
 
     fun getLogs(): List<String> {
