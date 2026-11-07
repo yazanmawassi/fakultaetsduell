@@ -291,7 +291,7 @@ class PlayerActionService(private val rootService: RootService) : AbstractRefres
         // Karten veröffentlichen und Aktionspunkte abziehen
         activeFaculty.publications.addAll(researchStack)
         researchStack.clear()
-        activeFaculty.actionPoints -= 2
+
 
         // 4. Move ALL cards from this research stack into the publications list
         activeFaculty.publications.addAll(researchStack)
