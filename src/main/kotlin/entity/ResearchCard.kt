@@ -8,7 +8,8 @@ package entity
 * drawn as ideas into a player's hand, placed onto research activity stacks on the table,
 * and permanently secured into the publications repository through successful publication actions.
 *
-* @property suit The card category or suit color (e.g., HEARTS, SPADES) defining which research topic this card belongs to.
+* @property suit The card category or suit color (e.g., HEARTS, SPADES) defining which research topic this card
+ * belongs to.
 * @property value The specific card rank or content value which can influence interactions or indicate the card's rank.
 */
 class ResearchCard(
