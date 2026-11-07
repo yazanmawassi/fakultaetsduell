@@ -157,12 +157,12 @@ class EndGameScene(
             resultLabels += resultLabel(posX = 1190, posY = yPosition, width = 160, text = score.total.toString())
         }
 
-        addComponents(*resultLabels.toTypedArray())
+        resultLabels.forEach { addComponents(it) }
         logOverlay.toFront()
     }
 
     private fun clearResultLabels() {
-        removeComponents(*resultLabels.toTypedArray())
+        resultLabels.forEach { removeComponents(it) }
         resultLabels.clear()
     }
 
