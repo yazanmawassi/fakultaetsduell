@@ -25,8 +25,10 @@ class SopraApplication :
     /** End scene displaying the final scores. */
     private val endGameScene = EndGameScene(
         onGameEnded = { showEndGameScene() },
-        onBackToMenu = { showGameScene(startScene) },
-        onLogRequested = { gameScene.getLogs() }
+        onBackToMenu = {
+            rootService.currentGame = null
+            startScene.clearFields()
+            showGameScene(startScene) }
     )
 
     init {
